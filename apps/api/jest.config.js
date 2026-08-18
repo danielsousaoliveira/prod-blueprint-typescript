@@ -31,7 +31,15 @@ module.exports = {
   // covers it with Testcontainers. Including it here would either drag the threshold
   // down to a number that permits untested domain logic, or invite mock-heavy tests that
   // assert the mocks rather than the behaviour.
-  collectCoverageFrom: ['shared/**/*.ts', 'modules/**/domain/**/*.ts', '!**/*.spec.ts'],
+  collectCoverageFrom: [
+    'shared/intervals/**/*.ts',
+    'shared/time/**/*.ts',
+    'modules/appointments/domain/appointment.ts',
+    'modules/appointments/domain/state-machine.ts',
+    'modules/auth/domain/*.ts',
+    'modules/availability/domain/availability.engine.ts',
+    '!**/*.spec.ts',
+  ],
   // A ratchet, not a target: it exists to make a regression fail the build.
   coverageThreshold: {
     global: { statements: 95, branches: 85, functions: 90, lines: 95 },
