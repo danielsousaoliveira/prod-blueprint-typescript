@@ -1,5 +1,5 @@
 /**
- * Doctors and patients, referenced (not embedded) from appointments — design rationale.
+ * Doctors and patients, referenced (not embedded) from appointments — documented design choice.
  *
  * That reference is precisely what creates the N+1 problem GraphQL is about to make
  * obvious: a query for 50 appointments, each asking for `doctor { name }`, naively issues

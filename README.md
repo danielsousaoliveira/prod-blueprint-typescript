@@ -160,7 +160,7 @@ CONFIRMED:        doctor: cancel | complete
 `transition(appointment, event, actor)` is pure, so the whole rule set is enumerated rather
 than sampled: 6 statuses × 2 roles × 7 events = **84 combinations**, all asserted. Two
 distinct failures — not a party at all (**404**, so ids stay unenumerable) and a party
-whose role may not do this (**403**). See [design rationale](design rationale).
+whose role may not do this (**403**). The authorization rule is enforced by the domain state machine.
 
 ### Where the double-booking guarantee lives
 
@@ -175,8 +175,8 @@ One line, in `apps/api/src/persistence/migrations/index.ts`:
 A **partial** unique index on `(doctorId, startsAt)`. Unique, so two documents cannot claim
 one slot. Partial, so cancelled appointments become invisible to the constraint and release
 their time instead of burning it forever. Everything else — the service checks, the Redis
-lock, the optimistic-concurrency branch — is contention management. See
-[design rationale](design rationale).
+lock, the optimistic-concurrency branch — is contention management. The database index is
+the correctness boundary.
 
 ## Local infrastructure note
 
@@ -198,14 +198,13 @@ with the currently-running code because both versions serve traffic during a rol
 
 ## Known limitations
 
-Named here rather than left to be discovered — the full list is at the end of
-[`design rationale`](design rationale).
+Named here rather than left to be discovered.
 
 - **No self-service registration, password reset, email verification or MFA.** Accounts are
   seeded. Password reset in particular is where many auth systems are actually broken, and
   building it badly would be worse than not building it.
 - **A counter-proposed slot is not reserved** while the patient decides. Documented, tested,
-  and a genuine limit of a single-field unique index (design rationale).
+  and a genuine limit of a single-field unique index.
 - **Per-IP login rate limiting will misbehave behind a load balancer** — `request.ip` becomes
   the balancer's. Flagged in `auth.controller.ts` rather than guessed at.
 - **No Content-Security-Policy.** The httpOnly cookie limits what an XSS can steal; a CSP is

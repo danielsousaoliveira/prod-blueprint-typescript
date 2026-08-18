@@ -21,7 +21,7 @@ import type { Party } from '../../appointments/domain/appointment';
  * The moment a third role appears that cannot be a party to an appointment — an
  * administrator, a receptionist booking on a patient's behalf — this stops being true
  * and `Role` becomes its own union with an explicit mapping. That is the trigger, and
- * it is recorded in design rationale.
+ * it is recorded in documented design choice.
  * ============================================================================
  */
 export type Role = Party;

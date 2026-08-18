@@ -110,7 +110,7 @@ export class AppointmentService {
      * A doctor booking on a patient's behalf is a real clinic workflow and it is
      * deliberately not supported: it needs a way to say *which* patient, which reopens
      * exactly the "client asserts an identity" hole closed above, and doing it safely
-     * means modelling delegation properly. Recorded in design rationale rather than
+     * means modelling delegation properly. Recorded in documented design choice rather than
      * half-built.
      */
     if (actor.role !== 'patient') {

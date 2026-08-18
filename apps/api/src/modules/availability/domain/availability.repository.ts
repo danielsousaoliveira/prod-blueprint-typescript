@@ -11,9 +11,9 @@ import type { AvailabilityException } from './availability.engine';
  */
 export interface DoctorSchedule {
   readonly doctorId: string;
-  /** Embedded on the doctor document — bounded, always read together. design rationale. */
+  /** Embedded on the doctor document — bounded, always read together. documented design choice. */
   readonly rules: readonly RecurringAvailabilityRule[];
-  /** Referenced in a separate collection — unbounded growth. design rationale. */
+  /** Referenced in a separate collection — unbounded growth. documented design choice. */
   readonly exceptions: readonly AvailabilityException[];
   /** IANA identifier for the clinic. Never an offset. */
   readonly timezone: string;

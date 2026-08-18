@@ -163,7 +163,7 @@ export class AppointmentsController {
     actor: Actor,
   ): Promise<AppointmentDto> {
     // Pre-check for a clearer error. NOT the double-booking guarantee — see
-    // AvailabilityService.isBookable and design rationale.
+    // AvailabilityService.isBookable and documented design choice.
     const bookable = await this.availability.isBookable(
       body.doctorId,
       interval(body.startsAt, body.endsAt),

@@ -181,7 +181,7 @@ export function subtractIntervals(
  * guarantee in Phase 4. With variable-length appointments, two bookings could overlap
  * without sharing a start instant, and no unique index can express that — it becomes a
  * range-overlap constraint needing a transaction with a range query, or Postgres
- * `EXCLUDE ... USING gist`. See design rationale.
+ * `EXCLUDE ... USING gist`. See documented design choice.
  */
 export function chopIntoSlots(
   regions: readonly Interval[],
