@@ -56,7 +56,7 @@ export const APPOINTMENT_UPDATED = 'appointmentUpdated';
  * Fine for a single instance, and WRONG the moment there are two: a subscriber connected
  * to pod A never sees an event published on pod B. Production needs a Redis-backed
  * PubSub, which Phase 6 introduces alongside BullMQ. Flagged here rather than discovered
- * later — see DECISIONS §21 for the Cloud Run consequences.
+ * later — see design rationale for the Cloud Run consequences.
  */
 export const pubSub = new PubSub();
 
@@ -363,7 +363,7 @@ export class DoctorResolver {
    * REST the endpoint author controls the whole query and there is no edge to follow.
    *
    * The field is kept rather than deleted, because it is what makes the schema cyclic and
-   * therefore what makes depth limiting meaningful (DECISIONS §19). It now returns the
+   * therefore what makes depth limiting meaningful (design rationale). It now returns the
    * intersection of "this doctor's appointments" and "the viewer's appointments":
    *
    *   - a doctor viewing themselves gets their own list;

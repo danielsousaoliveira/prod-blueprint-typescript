@@ -42,7 +42,7 @@ and MongoDB while both look healthy.
 **Cosmos DB's Mongo API is not MongoDB.** The most relevant difference for this project:
 **partial indexes** are unsupported. The double-booking guarantee is a partial unique
 index on `(doctorId, startsAt)` filtered to active statuses — without the filter, a
-cancelled slot could never be rebooked (DECISIONS §14). So "move to Azure" is not a
+cancelled slot could never be rebooked (design rationale). So "move to Azure" is not a
 deployment change here; it is a redesign of the correctness mechanism. Atlas on Azure
 avoids that entirely, which is why it is the first choice in the table.
 
@@ -78,7 +78,7 @@ The discipline is identical and platform-independent — only the noun changes.
 - **Cloud Armor** (AWS WAF / Azure Front Door) in front, with rate limiting. GraphQL makes
   this more than routine hardening: the client composes the query, so depth and complexity
   limits are application-level defences that a network-level one complements rather than
-  replaces (DECISIONS §19).
+  replaces (design rationale).
 - **Uptime checks** against `/health`, alerting on the readiness endpoint rather than on
   raw error rate — it fails before users notice.
 - **Structured log correlation.** Pino already emits JSON, which Cloud Logging parses

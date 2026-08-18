@@ -160,7 +160,7 @@ export const migrations: readonly Migration[] = [
        * Unique on email — the constraint that makes "one account per address" true rather
        * than merely intended.
        *
-       * Same reasoning as the appointment slot index (DECISIONS §14, §16): a check-then-
+       * Same reasoning as the appointment slot index (design rationale, §16): a check-then-
        * insert in application code has a window between the read and the write, and two
        * concurrent signups for the same address both pass it. The database is the only
        * place that decides atomically.

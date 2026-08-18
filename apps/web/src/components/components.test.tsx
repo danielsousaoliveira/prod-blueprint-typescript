@@ -116,7 +116,7 @@ describe('AvailabilityCalendar', () => {
         viewerZone={LISBON}
         error={
           new ApiError({
-            type: 'https://scheduler.example/problems/slot-taken',
+            type: 'https://tenantforge.example/problems/slot-taken',
             title: 'Slot already taken',
             status: 409,
           })
@@ -285,7 +285,7 @@ describe('BookingFlow', () => {
         successCount={0}
         error={
           new ApiError({
-            type: 'https://scheduler.example/problems/slot-taken',
+            type: 'https://tenantforge.example/problems/slot-taken',
             title: 'Slot already taken',
             status: 409,
           })

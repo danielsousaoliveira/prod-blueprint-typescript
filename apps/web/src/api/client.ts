@@ -6,7 +6,7 @@
  * ============================================================================
  *
  * GraphQL for the CALENDAR read: it fetches availability, the doctor, and existing
- * appointments in one round trip, which is the case DECISIONS §19 identifies as GraphQL's
+ * appointments in one round trip, which is the case design rationale identifies as GraphQL's
  * genuine win. REST for MUTATIONS: they need status codes (409 for a lost race) and the
  * `Idempotency-Key` header, both of which GraphQL flattens into a 200 with an errors array.
  *
@@ -106,7 +106,7 @@ async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
  *
  * Note the error handling: GraphQL returns HTTP 200 even for failures, so checking
  * `response.ok` is not enough — the `errors` array has to be inspected explicitly. That
- * is one of REST's advantages made concrete (DECISIONS §19): every proxy and monitoring
+ * is one of REST's advantages made concrete (design rationale): every proxy and monitoring
  * tool in the path sees a successful request.
  */
 export async function graphql<T>(

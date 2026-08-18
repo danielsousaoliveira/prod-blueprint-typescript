@@ -11,7 +11,7 @@ import { ProblemException, problems } from '../../shared/http/problem-details';
  * ============================================================================
  *
  * This is the cost of choosing a cookie over `Authorization: Bearer`, and it is the
- * honest downside of DECISIONS §32.
+ * honest downside of design rationale.
  *
  * Browsers attach cookies to requests **automatically, by destination**, with no regard
  * for what site initiated them. So `evil.example` can host a form that POSTs to our API,

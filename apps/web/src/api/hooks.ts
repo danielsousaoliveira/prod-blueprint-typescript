@@ -45,7 +45,7 @@ export const keys = {
  * How often to poll for updates.
  *
  * POLLING, not the GraphQL subscription — a deliberate reversal of the obvious choice,
- * for the reason documented in DECISIONS §21. Cloud Run bills for connection duration,
+ * for the reason documented in design rationale. Cloud Run bills for connection duration,
  * caps request timeout and has no session affinity by default, and the in-process PubSub
  * does not fan out across instances anyway. A doctor's inbox tolerates ten seconds of
  * latency perfectly well; an appointment request is not a chat message.

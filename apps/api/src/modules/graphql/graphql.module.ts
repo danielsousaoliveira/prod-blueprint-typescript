@@ -116,7 +116,7 @@ function readCookie(header: string | undefined, name: string): string | undefine
           // Cloud Run handles long-lived WebSockets poorly — it bills for connection
           // duration, caps request timeout, and does not do session affinity by default.
           // Combined with the in-process PubSub in the resolver (which does not fan out
-          // across instances), production polls instead. DECISIONS §30.
+          // across instances), production polls instead. design rationale.
           'graphql-ws': {
             /**
              * ============================================================================
@@ -142,7 +142,7 @@ function readCookie(header: string | undefined, name: string): string | undefine
              * established before logout keeps receiving updates until the client
              * disconnects. Fixing that properly means tracking sockets per session and
              * closing them on logout. Not built — this project polls in production
-             * (DECISIONS §30), so the subscription is a demonstration rather than a
+             * (design rationale), so the subscription is a demonstration rather than a
              * shipped path, and pretending otherwise by half-building it would be worse
              * than saying so.
              * ============================================================================
