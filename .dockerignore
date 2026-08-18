@@ -1,0 +1,19 @@
+# Everything the build does not need. Keeping the context small speeds up every build
+# (the whole context is sent to the daemon before anything runs) and, more importantly,
+# stops secrets and local state being copied into a layer by accident.
+node_modules
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+**/.env
+**/.env.*
+!**/.env.example
+**/*.spec.ts
+**/*.contract.ts
+e2e
+playwright-report
+test-results
+tasks
+*.md

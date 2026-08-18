@@ -1,0 +1,36 @@
+/*
+ * Tailwind v4: one import, no config file.
+ *
+ * v4 moved configuration into CSS (`@theme`) and dropped the `tailwind.config.js` +
+ * PostCSS pairing that v3 needed. Nothing here needs a custom theme, so the import is
+ * the whole setup — a `tailwind.config.js` would be an empty file whose only effect is
+ * making a reader look for settings that are not there.
+ *
+ * Scanning is automatic in v4 (it walks the project from the CSS file's location), which
+ * is why there is no `content` array either.
+ */
+@import 'tailwindcss';
+
+/*
+ * A system font stack rather than a webfont.
+ *
+ * A webfont is a render-blocking network request and a layout shift, for a project whose
+ * point is not typography. The system stack is instant, and it looks native on every
+ * platform.
+ */
+:root {
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: #f8fafc; /* slate-50 */
+}

@@ -1,0 +1,1473 @@
+<title>Appointment Scheduler — Architecture Blueprint</title>
+<style>
+  :root {
+    --paper: #FBFCFD;
+    --ink: #101A22;
+    --ink-2: #35485A;
+    --muted: #6B7E8E;
+    --line: #DCE4EA;
+    --line-soft: #EBF0F4;
+    --accent: #0E7C86;
+    --accent-soft: #E4F2F3;
+    --async: #9A5B0B;
+    --async-soft: #FAF0E2;
+    --danger: #A32B2B;
+    --danger-soft: #FBEBEB;
+    --panel: #FFFFFF;
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0C1319;
+      --ink: #E6EDF2;
+      --ink-2: #B4C4D0;
+      --muted: #8A9BA8;
+      --line: #22323E;
+      --line-soft: #18242D;
+      --accent: #4FBAC4;
+      --accent-soft: #102C30;
+      --async: #D89B4A;
+      --async-soft: #2A2013;
+      --danger: #E08585;
+      --danger-soft: #2B1616;
+      --panel: #101A21;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0C1319;
+    --ink: #E6EDF2;
+    --ink-2: #B4C4D0;
+    --muted: #8A9BA8;
+    --line: #22323E;
+    --line-soft: #18242D;
+    --accent: #4FBAC4;
+    --accent-soft: #102C30;
+    --async: #D89B4A;
+    --async-soft: #2A2013;
+    --danger: #E08585;
+    --danger-soft: #2B1616;
+    --panel: #101A21;
+  }
+  :root[data-theme="light"] {
+    --paper: #FBFCFD;
+    --ink: #101A22;
+    --ink-2: #35485A;
+    --muted: #6B7E8E;
+    --line: #DCE4EA;
+    --line-soft: #EBF0F4;
+    --accent: #0E7C86;
+    --accent-soft: #E4F2F3;
+    --async: #9A5B0B;
+    --async-soft: #FAF0E2;
+    --danger: #A32B2B;
+    --danger-soft: #FBEBEB;
+    --panel: #FFFFFF;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.25rem 6rem;
+  }
+  @media (min-width: 1000px) {
+    .shell { grid-template-columns: 15rem minmax(0, 1fr); gap: 3.5rem; }
+  }
+
+  /* ---- nav rail ---- */
+  nav.rail { display: none; }
+  @media (min-width: 1000px) {
+    nav.rail {
+      display: block;
+      position: sticky;
+      top: 0;
+      align-self: start;
+      max-height: 100vh;
+      overflow-y: auto;
+      padding: 3.5rem 0 3rem;
+      border-right: 1px solid var(--line-soft);
+    }
+  }
+  .rail-label {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: .9rem;
+  }
+  .rail ol { list-style: none; display: flex; flex-direction: column; gap: .1rem; margin: 0 0 1.75rem; padding: 0; }
+  .rail a {
+    display: block;
+    padding: .3rem .6rem .3rem 0;
+    color: var(--ink-2);
+    text-decoration: none;
+    font-size: .855rem;
+    line-height: 1.35;
+    border-left: 2px solid transparent;
+    padding-left: .7rem;
+  }
+  .rail a:hover { color: var(--accent); border-left-color: var(--accent); }
+  .rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .rail .num {
+    font-family: var(--mono);
+    font-size: .7rem;
+    color: var(--muted);
+    margin-right: .45rem;
+  }
+
+  main { min-width: 0; padding-top: 3rem; }
+
+  /* ---- masthead ---- */
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 1.75rem; margin-bottom: 2.5rem; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    line-height: 1.06;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: .55rem 0 .7rem;
+  }
+  .standfirst { font-size: 1.05rem; color: var(--ink-2); max-width: 60ch; }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 1.75rem;
+  }
+  .fact { background: var(--panel); padding: .8rem .9rem; }
+  .fact dt {
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .fact dd { margin: .25rem 0 0; font-size: .93rem; font-variant-numeric: tabular-nums; }
+
+  /* ---- sections ---- */
+  section { margin-top: 4.5rem; scroll-margin-top: 1.5rem; }
+  .sec-head { display: flex; align-items: baseline; gap: .85rem; border-bottom: 1px solid var(--line); padding-bottom: .6rem; margin-bottom: 1.6rem; }
+  .sec-num {
+    font-family: var(--mono);
+    font-size: .78rem;
+    color: var(--accent);
+    letter-spacing: .06em;
+    flex: none;
+  }
+  h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(1.5rem, 3.2vw, 2rem); line-height: 1.15; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+  h3 { font-family: var(--sans); font-weight: 650; font-size: 1.02rem; letter-spacing: -0.005em; margin: 2.25rem 0 .6rem; }
+  h4 { font-family: var(--mono); font-weight: 600; font-size: .76rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 1.6rem 0 .5rem; }
+  p { max-width: 68ch; margin: 0 0 1rem; }
+  ul, ol.body { max-width: 68ch; padding-left: 1.15rem; margin: 0 0 1rem; }
+  li { margin-bottom: .35rem; }
+  strong { font-weight: 650; }
+  code {
+    font-family: var(--mono);
+    font-size: .855em;
+    background: var(--line-soft);
+    padding: .09em .34em;
+    border-radius: 2px;
+    word-break: break-word;
+  }
+  a { color: var(--accent); }
+
+  /* ---- diagram plate: always light, like a printed plate ---- */
+  .plate {
+    background: #FFFFFF;
+    border: 1px solid #D8E0E6;
+    margin: 1.5rem 0 1.75rem;
+    overflow-x: auto;
+    padding: 1.25rem 1rem;
+  }
+  .plate pre.mermaid { background: transparent; margin: 0; min-width: 0; }
+  .plate-cap {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #6B7E8E;
+    border-top: 1px solid #EBF0F4;
+    margin-top: .9rem;
+    padding-top: .6rem;
+  }
+
+  /* ---- tables ---- */
+  .tw { overflow-x: auto; margin: 1.1rem 0 1.75rem; border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; min-width: 40rem; }
+  th, td { text-align: left; padding: .58rem .8rem; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--mono);
+    font-size: .66rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--line-soft);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td code { background: none; padding: 0; color: var(--ink-2); }
+
+  /* ---- callouts ---- */
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: .85rem 1rem;
+    margin: 1.25rem 0;
+    font-size: .93rem;
+    max-width: 68ch;
+  }
+  .note.async { border-left-color: var(--async); background: var(--async-soft); }
+  .note.gap { border-left-color: var(--danger); background: var(--danger-soft); }
+  .note p:last-child { margin-bottom: 0; }
+  .note-label {
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: .3rem;
+    opacity: .8;
+  }
+
+  .trace {
+    font-family: var(--mono);
+    font-size: .8rem;
+    line-height: 1.85;
+    background: var(--line-soft);
+    border: 1px solid var(--line);
+    padding: .9rem 1rem;
+    overflow-x: auto;
+    margin: 1.1rem 0 1.6rem;
+    white-space: pre;
+  }
+
+  hr.rule { border: none; border-top: 1px solid var(--line); margin: 3rem 0; }
+  .kicker { font-family: var(--serif); font-size: 1.12rem; color: var(--ink-2); max-width: 62ch; font-style: italic; }
+  footer { margin-top: 5rem; border-top: 1px solid var(--line); padding-top: 1.25rem; color: var(--muted); font-size: .85rem; }
+</style>
+
+<div class="shell">
+<nav class="rail" aria-label="Contents">
+  <p class="rail-label">Blueprint</p>
+  <ol>
+    <li><a href="#d0"><span class="num">00</span>Inventory</a></li>
+    <li><a href="#d1"><span class="num">01</span>High-level architecture</a></li>
+    <li><a href="#d2"><span class="num">02</span>Infrastructure &amp; deployment</a></li>
+    <li><a href="#d3"><span class="num">03</span>Request lifecycle</a></li>
+    <li><a href="#d4"><span class="num">04</span>Data flow</a></li>
+    <li><a href="#d5"><span class="num">05</span>Event catalogue</a></li>
+    <li><a href="#d6"><span class="num">06</span>Module breakdown</a></li>
+    <li><a href="#d7"><span class="num">07</span>Sequence diagrams</a></li>
+    <li><a href="#d8"><span class="num">08</span>Startup &amp; shutdown</a></li>
+    <li><a href="#d9"><span class="num">09</span>Production architecture</a></li>
+  </ol>
+  <p class="rail-label">Then</p>
+  <ol>
+    <li><a href="#walkthrough"><span class="num">→</span>Interview walkthrough</a></li>
+    <li><a href="#gaps"><span class="num">?</span>Open questions</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="masthead">
+  <p class="eyebrow">End-to-end technical blueprint</p>
+  <h1>Doctor Appointment Scheduling System</h1>
+  <p class="standfirst">One NestJS process serving REST and GraphQL over MongoDB and Redis, with in-process BullMQ workers and a transactional outbox. Two correctness properties drive every structural decision: no double-booking under concurrency, and timezone arithmetic that survives DST.</p>
+  <dl class="facts">
+    <div class="fact"><dt>Runtime</dt><dd>Node 22 · NestJS 11</dd></div>
+    <div class="fact"><dt>Datastores</dt><dd>MongoDB 7 · Redis 7</dd></div>
+    <div class="fact"><dt>Frontend</dt><dd>React 19 · Vite 8</dd></div>
+    <div class="fact"><dt>Deploy target</dt><dd>Cloud Run</dd></div>
+    <div class="fact"><dt>Tests</dt><dd>165 + 117 + 32 + 8</dd></div>
+    <div class="fact"><dt>Deployables</dt><dd>1 image</dd></div>
+  </dl>
+</header>
+
+<p class="kicker">Read section 00 first. It tells you which of the components you asked about actually exist in this codebase — several do not, and knowing which is the difference between explaining a system and describing one.</p>
+
+<!-- ============================= 00 ============================= -->
+<section id="d0">
+  <div class="sec-head"><span class="sec-num">00</span><h2>Component inventory — what exists, what doesn't</h2></div>
+
+  <p>Your brief lists components that a system of this shape often has. This one does not have all of them, and inventing them would make the whole document untrustworthy. Here is the honest ledger.</p>
+
+  <h4>Present in the codebase</h4>
+  <div class="tw"><table>
+    <thead><tr><th>Component</th><th>Where</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td>React SPA</td><td><code>apps/web</code></td><td>React 19 + Vite 8 + TanStack Query + Tailwind v4 + Luxon</td></tr>
+      <tr><td>API server</td><td><code>apps/api</code></td><td>NestJS 11 on Express 5 — REST <code>/v1/*</code> and GraphQL <code>/graphql</code> in one process</td></tr>
+      <tr><td>MongoDB</td><td><code>docker-compose.yml</code></td><td>Mongo 7, single-node <strong>replica set</strong> <code>rs0</code> — required for multi-document transactions</td></tr>
+      <tr><td>Redis</td><td><code>docker-compose.yml</code></td><td>Redis 7 — sessions, locks, idempotency, availability cache, BullMQ backing store</td></tr>
+      <tr><td>BullMQ</td><td><code>modules/jobs</code></td><td>Two queues (<code>notifications</code>, <code>reminders</code>) + one in-process worker</td></tr>
+      <tr><td>Background workers</td><td><code>JobsRuntime</code></td><td>Notification worker + outbox relay poller — <strong>in the API process</strong>, not separate containers</td></tr>
+      <tr><td>Transactional outbox</td><td><code>modules/outbox</code></td><td><code>outbox</code> collection, claim-based relay, 7-day TTL index</td></tr>
+      <tr><td>External API</td><td><code>HttpNotificationProvider</code></td><td>HTTP POST to a notification provider — the only outbound third party</td></tr>
+      <tr><td>Auth provider</td><td><code>modules/auth</code></td><td><strong>Self-hosted</strong>: argon2id + opaque Redis sessions. No Auth0/Firebase/OAuth</td></tr>
+      <tr><td>Container</td><td><code>apps/api/Dockerfile</code></td><td>3-stage build, non-root <code>node</code> user, <code>node dist/main.js</code> as PID 1's child</td></tr>
+      <tr><td>CI/CD</td><td><code>.github/workflows/ci.yml</code></td><td>GitHub Actions — 7 jobs, image build + smoke test + drain assertion</td></tr>
+      <tr><td>Cloud deployment</td><td><code>deploy/cloudrun/service.yaml</code></td><td>Knative Service definition for Google Cloud Run</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>Absent — do not claim these in the interview</h4>
+  <div class="tw"><table>
+    <thead><tr><th>Asked about</th><th>Status</th><th>What plays that role instead</th></tr></thead>
+    <tbody>
+      <tr><td>Nginx / reverse proxy</td><td>Not in the repo</td><td>Dev: the <strong>Vite dev-server proxy</strong> forwards <code>/v1</code> and <code>/graphql</code> to :3000. Prod: <strong>Cloud Run's front end</strong> terminates TLS and routes.</td></tr>
+      <tr><td>Load balancer</td><td>Not configured</td><td>Cloud Run's managed ingress load-balances across revisions/instances implicitly.</td></tr>
+      <tr><td>Mobile app</td><td>None</td><td>Responsive web only.</td></tr>
+      <tr><td>Object storage</td><td>None</td><td>No file uploads or binary assets exist in the domain.</td></tr>
+      <tr><td>Email provider</td><td>Abstracted, not integrated</td><td><code>NotificationProvider</code> port; the HTTP adapter posts to a configurable URL. MSW mocks it in e2e.</td></tr>
+      <tr><td>Inbound webhooks</td><td>None</td><td>Nothing external calls in. All traffic is browser → API.</td></tr>
+      <tr><td>Cron / scheduler service</td><td>No cron daemon</td><td>A 1-second <code>setInterval</code> drives the outbox relay; BullMQ <code>delay</code> drives reminders.</td></tr>
+      <tr><td>Kubernetes</td><td>None</td><td>Cloud Run (Knative). Docker Compose is <strong>infrastructure only</strong> — it never runs the app.</td></tr>
+      <tr><td>CDN, autoscaling policy beyond min/max, secrets rotation, APM</td><td>Discussed, not built</td><td>See §09 and <code>docs/cloud-mapping.md</code>.</td></tr>
+      <tr><td>Frontend deployment</td><td>Undefined</td><td>Only the API has a Dockerfile and a service definition. See §Open questions.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <span class="note-label">The single most important structural fact</span>
+    <p>There is <strong>one deployable</strong>. The HTTP API, the GraphQL server, the BullMQ notification worker and the outbox relay poller all run inside the same Node process, wired by the same Nest DI container. Scaling the API scales the workers. This is a deliberate trade — it removes a deployment unit at the cost of coupling their scaling — and it is the first thing a senior interviewer will probe.</p>
+  </div>
+</section>
+
+<!-- ============================= 01 ============================= -->
+<section id="d1">
+  <div class="sec-head"><span class="sec-num">01</span><h2>High-level architecture</h2></div>
+
+  <p>Every arrow is labelled with the actual protocol and payload. Solid arrows are synchronous request/response; dotted arrows are asynchronous.</p>
+
+  <div class="plate">
+<pre class="mermaid">
+graph TB
+  subgraph client["Browser — one origin"]
+    U["User<br/>doctor or patient"]
+    R["React 19 SPA<br/>TanStack Query · Luxon · Tailwind"]
+    C["Cookie jar<br/>sid — HttpOnly, SameSite=Lax"]
+  end
+
+  subgraph edge["Ingress"]
+    P["Vite proxy :5173 (dev)<br/>Cloud Run front end (prod)<br/>TLS termination"]
+  end
+
+  subgraph proc["API process — Node 22 / NestJS 11 — ONE container"]
+    MW["cookie-parser → CsrfMiddleware<br/>→ AuthGuard (global) → ZodValidationPipe<br/>→ ProblemDetailsFilter"]
+    REST["REST controllers<br/>/v1/auth · /v1/appointments · /v1/doctors · /health"]
+    GQL["Apollo GraphQL /graphql<br/>depth 7 · complexity 1000 · DataLoader"]
+    APP["Application services<br/>AuthService · AppointmentService · AvailabilityService"]
+    DOM["Domain — zero I/O<br/>state machine · interval algebra · DST expansion"]
+    REPO["Repository adapters<br/>Mongo* + InMemory* twins"]
+    RELAY["OutboxRelay poller<br/>setInterval 1000ms"]
+    WORK["BullMQ Worker<br/>queue: notifications"]
+  end
+
+  subgraph data["Stateful backing services"]
+    M[("MongoDB 7 — replSet rs0<br/>appointments · users · doctors · patients<br/>availability_rules · availability_exceptions<br/>outbox · migrations")]
+    RD[("Redis 7<br/>sessions · login counters · slot locks<br/>idempotency · availability cache · BullMQ")]
+  end
+
+  EXT["Notification provider<br/>external HTTP API"]
+
+  U -->|"click / type"| R
+  R -->|"POST /v1/auth/login {email,password}"| P
+  R -->|"POST /graphql — Calendar query"| P
+  R -->|"POST /v1/appointments + Idempotency-Key"| P
+  P -->|"HTTP/1.1 · Cookie: sid"| MW
+  MW --> REST
+  MW --> GQL
+  REST --> APP
+  GQL --> APP
+  APP --> DOM
+  APP --> REPO
+  REPO -->|"find / insert / findOneAndReplace<br/>multi-doc transaction"| M
+  APP -->|"SET NX PX — slot lock<br/>GET/SET — availability cache<br/>INCR — cache version"| RD
+  MW -->|"GET session:sha256(sid)<br/>EXPIRE — sliding TTL"| RD
+  P -->|"Set-Cookie: sid=…"| C
+  C -.->|"attached automatically"| P
+
+  REPO -.->|"outbox row in same txn"| M
+  RELAY -.->|"findOneAndUpdate — claim batch of 50"| M
+  RELAY -.->|"queue.add jobId=messageId"| RD
+  RD -.->|"job delivered"| WORK
+  WORK -.->|"POST /v1/messages<br/>Bearer key · Idempotency-Key"| EXT
+
+  R -->|"refetchInterval 10s — poll"| P
+
+  classDef sync fill:#E4F2F3,stroke:#0E7C86,color:#0C2E31
+  classDef async fill:#FAF0E2,stroke:#9A5B0B,color:#3A2408
+  classDef store fill:#EEF2F5,stroke:#5A6875,color:#101A22
+  class R,REST,GQL,APP,DOM,MW,P sync
+  class RELAY,WORK,EXT async
+  class M,RD,C store
+</pre>
+    <p class="plate-cap">Plate 01 — component graph. Teal = synchronous path. Amber = asynchronous path. Grey = state.</p>
+  </div>
+
+  <h3>Why each component exists</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Component</th><th>Purpose &amp; technology</th><th>Called by</th><th>Calls</th><th>Failure mode</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>React SPA</strong></td>
+        <td>Renders the calendar and inbox; converts UTC instants into the viewer's zone with Luxon. TanStack Query owns server state, caching and polling.</td>
+        <td>User</td>
+        <td>REST + GraphQL on the same origin</td>
+        <td>API down → query error state with a Try again button; retry policy skips 4xx, retries 5xx twice</td>
+      </tr>
+      <tr>
+        <td><strong>Ingress</strong></td>
+        <td>Makes the API same-origin with the SPA. In dev, Vite's proxy; in prod, Cloud Run. Same-origin is deliberate — it means cookie behaviour in dev matches prod.</td>
+        <td>Browser</td>
+        <td>API :3000 / :8080</td>
+        <td>Proxy down → network error in the browser</td>
+      </tr>
+      <tr>
+        <td><strong>NestJS API</strong></td>
+        <td>Hexagonal layering: <code>api → application → domain</code>, with <code>persistence</code> adapters injected behind Symbol tokens. Two transport surfaces over one application core.</td>
+        <td>Ingress</td>
+        <td>Mongo, Redis</td>
+        <td>Boots-or-dies on bad config (Zod validation at startup); <code>/health</code> returns 503 if a dependency is down</td>
+      </tr>
+      <tr>
+        <td><strong>MongoDB</strong></td>
+        <td>System of record. Runs as a replica set because the booking write path and the outbox both need multi-document transactions. The double-booking guarantee is a <strong>partial unique index</strong>, not application code.</td>
+        <td>Repository adapters</td>
+        <td>—</td>
+        <td>Duplicate key 11000 → translated to <code>SlotTakenError</code> → HTTP 409</td>
+      </tr>
+      <tr>
+        <td><strong>Redis</strong></td>
+        <td>Six distinct roles (see §04). Chosen once and reused rather than adding a store per concern.</td>
+        <td>Session store, lock, cache, idempotency store, BullMQ</td>
+        <td>—</td>
+        <td>Cache reads/writes fail <strong>soft</strong> (log + miss); session and lock failures fail <strong>hard</strong></td>
+      </tr>
+      <tr>
+        <td><strong>BullMQ + worker</strong></td>
+        <td>Delivers notifications off the request path with retries and exponential backoff. <code>jobId = outbox message id</code> gives queue-level dedup.</td>
+        <td>OutboxRelay</td>
+        <td>Notification provider</td>
+        <td>5 attempts, exponential from 1s; <code>removeOnFail: false</code> keeps failures inspectable</td>
+      </tr>
+      <tr>
+        <td><strong>OutboxRelay</strong></td>
+        <td>Closes the dual-write gap: the appointment and its event row commit in one transaction, so "saved but never notified" is impossible.</td>
+        <td><code>setInterval</code>, 1s</td>
+        <td>Mongo (claim), Redis (enqueue)</td>
+        <td>Claim has a 30s TTL, so a crashed relay's messages are re-claimed by the next poll</td>
+      </tr>
+      <tr>
+        <td><strong>Notification provider</strong></td>
+        <td>The only external dependency. Abstracted behind a port so the e2e suite can intercept it with MSW inside the API process.</td>
+        <td>Worker</td>
+        <td>—</td>
+        <td>5xx/429 marked retryable; job retried by BullMQ</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================= 02 ============================= -->
+<section id="d2">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Infrastructure &amp; deployment</h2></div>
+
+  <p>Three distinct environments. The critical thing to say out loud: <strong>Docker Compose never runs the application.</strong> It provisions MongoDB and Redis; the API runs on the host via <code>nest start --watch</code>. That is why <code>directConnection=true</code> is in the local Mongo URL.</p>
+
+  <div class="plate">
+<pre class="mermaid">
+graph TB
+  subgraph dev["① LOCAL DEVELOPMENT — developer laptop"]
+    direction TB
+    DV["Vite dev server<br/>host :5173 · HTTP<br/>proxies /v1 + /graphql"]
+    DA["nest start --watch<br/>host :3000 · HTTP<br/>SESSION_COOKIE_SECURE=false"]
+    subgraph dcomp["Docker Compose — default bridge network"]
+      DM[("mongo:7 · :27017→27017<br/>--replSet rs0 --bind_ip_all<br/>volume mongo-data:/data/db<br/>healthcheck: hello().isWritablePrimary")]
+      DR[("redis:7-alpine · :6379→6379<br/>volume redis-data:/data<br/>healthcheck: redis-cli ping")]
+    end
+    DV -->|"HTTP proxy, changeOrigin"| DA
+    DA -->|"mongodb://localhost:27017/?replicaSet=rs0&directConnection=true"| DM
+    DA -->|"redis://localhost:6379"| DR
+  end
+
+  subgraph ci["② CI — GitHub Actions, ubuntu-latest runners"]
+    direction TB
+    G["git push / pull_request<br/>concurrency: cancel-in-progress"]
+    L["lint<br/>eslint + prettier --check"]
+    T["typecheck<br/>tsc workspaces + e2e tsconfig"]
+    UT["unit<br/>Jest --coverage · Vitest"]
+    IT["integration<br/>Testcontainers: Mongo + Redis on random ports"]
+    E2["e2e<br/>docker compose --wait → migrate → Playwright<br/>Chromium, TZ America/New_York"]
+    B["build image<br/>buildx + GHA layer cache<br/>assert non-root · assert /health · assert clean drain"]
+    PB["publish — main only<br/>Workload Identity Federation → Artifact Registry"]
+    G --> L & T
+    L & T --> IT & E2
+    L & T & UT --> B
+    B & IT & E2 --> PB
+    G --> UT
+  end
+
+  subgraph prod["③ PRODUCTION — Google Cloud, europe-west1"]
+    direction TB
+    NET["Public internet · HTTPS 443<br/>managed certificate"]
+    CR["Cloud Run: scheduler-api<br/>containerPort 8080 · concurrency 80<br/>minScale 1 · maxScale 10<br/>cpu 1 · memory 512Mi · timeout 300s<br/>cpu-throttling: FALSE"]
+    SA["Service account<br/>scheduler-api@PROJECT.iam"]
+    SM["Secret Manager<br/>mongo-url · redis-url<br/>notification-url · notification-key"]
+    VPC["Serverless VPC connector<br/>scheduler-connector · egress: all-traffic"]
+    PM[("MongoDB Atlas<br/>private IP · TLS + SCRAM")]
+    PR[("Memorystore Redis<br/>private IP")]
+    JOB["Cloud Run Job: scheduler-migrate<br/>runs BEFORE the new revision"]
+    NET -->|"HTTPS 443 → 8080"| CR
+    CR --> SA
+    SA -->|"secretAccessor"| SM
+    SM -.->|"injected as env at boot"| CR
+    CR -->|"all egress"| VPC
+    VPC --> PM
+    VPC --> PR
+    JOB --> VPC
+  end
+
+  PB -.->|"image tag = git SHA"| JOB
+  JOB -.->|"then gcloud run services replace"| CR
+
+  classDef env fill:#F5F8FA,stroke:#5A6875
+  classDef store fill:#EEF2F5,stroke:#35485A
+  class DM,DR,PM,PR store
+</pre>
+    <p class="plate-cap">Plate 02 — three environments and the promotion path between them.</p>
+  </div>
+
+  <h3>Every deployment, answered</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Deployment</th><th>Where</th><th>Why</th><th>Who talks to it</th><th>Ports</th><th>Protocol</th><th>Auth</th><th>Data held</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Vite dev server</strong></td><td>Laptop</td><td>HMR + single-origin proxy so cookies behave as in prod</td><td>Browser</td><td>5173 public on localhost</td><td>HTTP</td><td>None</td><td>None — transient bundles</td></tr>
+      <tr><td><strong>API (dev)</strong></td><td>Laptop, host process</td><td>Watch-mode iteration; not containerised so restarts are instant</td><td>Vite proxy, Playwright</td><td>3000</td><td>HTTP</td><td>Session cookie</td><td>None — stateless</td></tr>
+      <tr><td><strong>mongo container</strong></td><td>Docker host</td><td>Transactions need a replica set; matching prod topology locally avoids a class of late surprises</td><td>API, migrate script, e2e</td><td>27017 published to host</td><td>Mongo wire</td><td>None locally</td><td>All domain data + migration ledger, on volume <code>mongo-data</code></td></tr>
+      <tr><td><strong>redis container</strong></td><td>Docker host</td><td>Sessions, locks, cache, queues</td><td>API</td><td>6379 published to host</td><td>RESP</td><td>None locally</td><td>Sessions, locks, jobs, cache — on volume <code>redis-data</code></td></tr>
+      <tr><td><strong>GitHub Actions</strong></td><td>Ephemeral runner</td><td>Gate merges; build and verify the image</td><td>Git push / PR</td><td>—</td><td>—</td><td>GITHUB_TOKEN; WIF OIDC for publish</td><td>Artifacts: Playwright report, 7-day retention</td></tr>
+      <tr><td><strong>Testcontainers</strong></td><td>Runner's Docker daemon</td><td>Real Mongo/Redis per integration run, random ports so jobs don't collide</td><td>Jest integration config</td><td>Random</td><td>Mongo wire / RESP</td><td>None</td><td>Discarded at teardown</td></tr>
+      <tr><td><strong>Cloud Run service</strong></td><td>GCP europe-west1</td><td>Runs the API image; scales 1→10</td><td>Public internet</td><td>Ingress 443 → container 8080</td><td>HTTPS → HTTP/1.1</td><td>Ingress <code>all</code> — app-level session auth</td><td>None persistent; instance-local memory only</td></tr>
+      <tr><td><strong>Cloud Run Job</strong></td><td>GCP</td><td>Applies migrations <em>before</em> the new revision — several booting instances would otherwise race</td><td>CI pipeline</td><td>—</td><td>—</td><td>Service account</td><td>Writes indexes + <code>migrations</code> ledger</td></tr>
+      <tr><td><strong>Atlas / Memorystore</strong></td><td>GCP VPC</td><td>Managed datastores on private IPs, never publicly exposed</td><td>API via VPC connector</td><td>Private</td><td>TLS Mongo wire / RESP</td><td>Credentials from Secret Manager</td><td>See §04</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>Environment variables — by concern</h4>
+  <div class="tw"><table>
+    <thead><tr><th>Group</th><th>Variables</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Runtime</td><td><code>NODE_ENV</code> <code>PORT</code> <code>LOG_LEVEL</code> <code>SHUTDOWN_TIMEOUT_MS</code></td><td>Shutdown timeout must stay under Cloud Run's 10s SIGTERM grace</td></tr>
+      <tr><td>Datastores</td><td><code>MONGO_URL</code> <code>MONGO_DB_NAME</code> <code>REDIS_URL</code></td><td>URLs are secrets in prod, plain in dev</td></tr>
+      <tr><td>Sessions</td><td><code>SESSION_TTL_SECONDS</code> <code>SESSION_COOKIE_NAME</code> <code>SESSION_COOKIE_SECURE</code></td><td>No signing secret exists — sessions are opaque random ids</td></tr>
+      <tr><td>Login defence</td><td><code>AUTH_MAX_ATTEMPTS_PER_EMAIL</code> <code>AUTH_MAX_ATTEMPTS_PER_IP</code> <code>AUTH_ATTEMPT_WINDOW_SECONDS</code></td><td>Two counters — see §06</td></tr>
+      <tr><td>CSRF</td><td><code>ALLOWED_ORIGINS</code></td><td>Never defaults to permissive</td></tr>
+      <tr><td>External</td><td><code>NOTIFICATION_PROVIDER_URL</code> <code>NOTIFICATION_API_KEY</code></td><td>Secret Manager in prod</td></tr>
+      <tr><td>Test-only</td><td><code>MOCK_NOTIFICATIONS</code> <code>SEED_DEMO_PASSWORD</code></td><td><code>MOCK_NOTIFICATIONS=1</code> activates MSW <em>and</em> registers <code>/__test__</code>. Demo seeding is refused when <code>NODE_ENV=production</code>.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <span class="note-label">The one annotation people miss</span>
+    <p><code>run.googleapis.com/cpu-throttling: 'false'</code>. Cloud Run throttles CPU outside a request by default. The outbox relay polls on a timer and the BullMQ worker processes jobs <em>between</em> requests — with throttling on, they'd only run while a request happened to be in flight. The symptom is "notifications arrive in bursts whenever someone loads a page", which is not an error and therefore expensive to diagnose.</p>
+  </div>
+</section>
+
+<!-- ============================= 03 ============================= -->
+<section id="d3">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Complete request lifecycle</h2></div>
+
+  <p>Tracing the most interesting request in the system: a patient clicks <strong>Confirm</strong> on a slot.</p>
+
+  <div class="plate">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant B as Browser / React
+  participant Q as TanStack Query
+  participant PX as Vite proxy / Cloud Run
+  participant MW as Nest middleware chain
+  participant CT as AppointmentsController
+  participant AV as AvailabilityService
+  participant RD as Redis
+  participant AS as AppointmentService
+  participant SM as State machine (pure)
+  participant MG as MongoDB
+  participant RL as OutboxRelay
+  participant WK as BullMQ worker
+  participant EX as Notification provider
+
+  U->>B: click "Confirm 09:30"
+  B->>Q: mutate({doctorId, startsAt, endsAt})
+  Q->>Q: crypto.randomUUID() → Idempotency-Key
+  Q->>PX: POST /v1/appointments<br/>Cookie: sid · Idempotency-Key: uuid<br/>{doctorId, startsAt, endsAt} ISO-8601
+  PX->>MW: forward, same origin
+  MW->>MW: cookie-parser → req.cookies.sid
+  MW->>MW: CsrfMiddleware — Origin ∈ ALLOWED_ORIGINS?<br/>Sec-Fetch-Site ≠ cross-site?
+  MW->>RD: GET session:sha256(sid)
+  RD-->>MW: {userId, role, profileId, createdAt}
+  MW->>RD: EXPIRE — slide TTL 7 days
+  MW->>MW: AuthGuard sets req.actor · ZodValidationPipe parses body
+  MW->>CT: handler(body, actor, idempotencyKey)
+
+  CT->>RD: SET idem:{userId}:{key} NX EX 86400
+  alt key already claimed
+    RD-->>CT: existing record
+    CT-->>B: 409 in-flight · 422 hash mismatch · or cached 201 body
+  end
+
+  CT->>AV: isBookable(doctorId, slot)
+  AV->>RD: GET avail-version:{doctorId} then GET avail:{id}:v{n}:{from}:{to}
+  alt cache miss
+    AV->>MG: find schedule + active appointments in range
+    AV->>AV: computeAvailability — expand DST-safe rules,<br/>subtract exceptions + held slots, chop into slots
+    AV->>RD: SET avail:… EX 60
+  end
+  AV-->>CT: true — slot is on the grid
+
+  CT->>AS: request({doctorId, slot}, actor)
+  AS->>AS: reject unless actor.role === 'patient'
+  AS->>RD: SET lock:slot:{doctorId}:{startsAt} NX PX 3000
+  alt lock not acquired
+    RD-->>AS: nil → CONTENDED → 409
+  end
+  AS->>MG: startSession → withTransaction
+  MG->>MG: insertOne(appointment) — partial unique index enforces uniqueness
+  MG->>MG: insertMany(outbox) — same transaction
+  MG-->>AS: committed  (or E11000 → SlotTakenError → 409)
+  AS->>RD: INCR avail-version:{doctorId} — invalidate cache
+  AS->>RD: EVAL release lock if token matches
+  AS-->>CT: ok(appointment)
+  CT->>RD: idempotency record → completed, body cached
+  CT-->>B: 201 · application/json · AppointmentDto
+
+  B->>Q: onSettled → invalidate calendar + appointments
+  Q->>PX: POST /graphql — Calendar refetch
+  B->>U: slot disappears, request appears as REQUESTED
+
+  Note over RL,EX: asynchronous, off the request path
+  RL->>MG: findOneAndUpdate — claim ≤50 unpublished, claimedUntil=now+30s
+  RL->>RD: queue.add(type, payload, {jobId: messageId, attempts: 5})
+  RL->>MG: markPublished(ids)
+  RD-->>WK: deliver job
+  WK->>EX: POST /v1/messages<br/>Authorization: Bearer · Idempotency-Key: messageId
+  EX-->>WK: 202 Accepted
+</pre>
+    <p class="plate-cap">Plate 03 — booking request, end to end. Steps 1–33 synchronous, the rest asynchronous.</p>
+  </div>
+
+  <h3>Step-by-step contract</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Step</th><th>Input</th><th>Output</th><th>Validation / auth</th><th>Failures &amp; retries</th><th>Logging</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1. User action</strong></td><td>Pointer/keyboard event on a slot button</td><td>Local state: selected slot</td><td>Button disabled while a mutation is pending</td><td>—</td><td>None</td></tr>
+      <tr><td><strong>2. React mutation</strong></td><td>Slot object</td><td><code>fetch</code> with <code>credentials: 'include'</code></td><td>Fresh UUID per attempt as Idempotency-Key</td><td>Mutations: <code>retry: false</code> — a booking must not silently double-fire</td><td>None</td></tr>
+      <tr><td><strong>3. Ingress</strong></td><td>HTTP request</td><td>Forwarded, <code>changeOrigin</code></td><td>TLS terminated in prod</td><td>Connection refused → browser network error</td><td>Cloud Run request log</td></tr>
+      <tr><td><strong>4. cookie-parser</strong></td><td><code>Cookie</code> header</td><td><code>req.cookies</code></td><td><strong>Unsigned</strong> — a tampered id simply fails to resolve in Redis, so a signing secret would guard a check the store already performs</td><td>—</td><td>Cookie header redacted by Pino</td></tr>
+      <tr><td><strong>5. CsrfMiddleware</strong></td><td>Method, <code>Origin</code>, <code>Sec-Fetch-Site</code></td><td><code>next()</code> or 403</td><td>Skips GET/HEAD/OPTIONS. Rejects a present-but-unlisted Origin, and any <code>cross-site</code> fetch</td><td>403 <code>cross-origin-request</code> — no retry</td><td>Request log</td></tr>
+      <tr><td><strong>6. AuthGuard</strong></td><td><code>sid</code></td><td><code>req.actor = {userId, role, profileId}</code></td><td>Global <code>APP_GUARD</code> — <strong>deny by default</strong>; <code>@Public()</code> opts out. Public routes still resolve a session, which is how <code>/v1/auth/me</code> distinguishes logged-out from logged-in</td><td>401 <code>unauthenticated</code>; TanStack Query does not retry 4xx</td><td>Request log</td></tr>
+      <tr><td><strong>7. ZodValidationPipe</strong></td><td>Raw JSON body</td><td>Typed, ISO strings → epoch millis</td><td><code>datetime({offset:true})</code>, <code>endsAt &gt; startsAt</code>, ranges ≤ 90 days</td><td>422 with a per-field <code>errors[]</code> array</td><td>—</td></tr>
+      <tr><td><strong>8. Idempotency claim</strong></td><td><code>{userId}:{key}</code>, SHA-256 of the body</td><td>null (proceed) or a record</td><td>Key scoped by user — one client cannot probe another's keys</td><td>Same key + different body → 422; still in flight → 409; completed → replay the cached 201</td><td>—</td></tr>
+      <tr><td><strong>9. isBookable</strong></td><td>doctorId, interval</td><td>boolean</td><td>Slot must match the computed grid <em>exactly</em>, start and end</td><td>422 <code>slot-unavailable</code>. Cache failures are swallowed and treated as a miss</td><td><code>warn</code> on cache read failure</td></tr>
+      <tr><td><strong>10. Distributed lock</strong></td><td><code>lock:slot:{doctorId}:{startsAt}</code>, TTL 3000ms</td><td>release fn or null</td><td>Random token; release is a Lua CAS so a slow request cannot delete a lock it no longer owns</td><td>409 <code>contended</code>. This is an <em>optimisation</em> — the index is the guarantee</td><td>—</td></tr>
+      <tr><td><strong>11. Mongo transaction</strong></td><td>Appointment doc + outbox docs</td><td>Both committed or neither</td><td>Partial unique index on <code>(doctorId, startsAt)</code> filtered to active statuses</td><td>E11000 → 409 <code>slot-taken</code>. Transient transaction errors retried by the driver</td><td><code>error</code> on unexpected repository errors</td></tr>
+      <tr><td><strong>12. Cache invalidation</strong></td><td>doctorId</td><td><code>INCR avail-version</code></td><td>—</td><td>Failure is logged at <code>error</code> but does not fail the request — stale reads self-heal within 60s</td><td>Yes</td></tr>
+      <tr><td><strong>13. Response</strong></td><td>Domain <code>Appointment</code> union</td><td>Flat <code>AppointmentDto</code>, ISO strings</td><td>DTO is a stable contract, decoupled from the discriminated union</td><td>All errors leave as RFC 7807 <code>application/problem+json</code></td><td>pino-http one line per request; <code>/health</code> excluded</td></tr>
+      <tr><td><strong>14. Frontend render</strong></td><td>201 body</td><td>Invalidate → refetch → re-render</td><td><code>ApiError.isSlotConflict</code> drives a specific message</td><td>Conflict → "someone just took that slot", list refreshes</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================= 04 ============================= -->
+<section id="d4">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Data flow — where every entity travels</h2></div>
+
+  <div class="plate">
+<pre class="mermaid">
+graph LR
+  subgraph orig["Origination"]
+    F1["Login form"]
+    F2["Slot click"]
+    F3["Inbox action"]
+    F4["Migration 005 / seed"]
+  end
+
+  subgraph val["Validation"]
+    V1["loginSchema<br/>email ≤320 · password ≤1024"]
+    V2["requestAppointmentSchema<br/>ISO+offset · endsAt&gt;startsAt"]
+    V3["State machine<br/>legal transition + permitted role"]
+  end
+
+  subgraph trans["Transformation"]
+    T1["normaliseEmail — trim + lowercase"]
+    T2["argon2id verify — constant-ish cost"]
+    T3["ISO → epoch ms"]
+    T4["Domain union → flat DTO"]
+    T5["Luxon: UTC instant → viewer zone"]
+  end
+
+  subgraph cache["Redis"]
+    C1["session:sha256(sid)<br/>TTL 7d sliding"]
+    C2["login-fail:email · login-fail:ip<br/>TTL 900s"]
+    C3["lock:slot:{doctor}:{start}<br/>PX 3000"]
+    C4["idem:{user}:{key}<br/>TTL 24h"]
+    C5["avail:{doctor}:v{n}:{from}:{to}<br/>TTL 60s + version key"]
+    C6["bull:notifications · bull:reminders"]
+  end
+
+  subgraph mongo["MongoDB — system of record"]
+    M1["users<br/>uniq email"]
+    M2["appointments<br/>uniq_doctor_slot_active"]
+    M3["availability_rules — embedded rules"]
+    M4["availability_exceptions"]
+    M5["doctors · patients"]
+    M6["outbox — TTL 7d after publish"]
+    M7["migrations ledger"]
+  end
+
+  OUT["Notification provider"]
+
+  F1 -->|"{email,password}"| V1 --> T1 --> T2
+  T2 -->|"findByEmail"| M1
+  T2 -->|"32 random bytes → base64url"| C1
+  T2 -->|"failure: INCR both counters"| C2
+  C1 -->|"Set-Cookie sid"| BR["Browser cookie jar"]
+
+  F2 -->|"POST /v1/appointments"| V2 --> T3
+  T3 --> C4
+  T3 --> C3
+  T3 -->|"insertOne + insertMany, one txn"| M2
+  T3 -.->|"same txn"| M6
+  T3 -->|"INCR version"| C5
+
+  F3 -->|"POST /v1/appointments/:id/{action}"| V3
+  V3 -->|"findOneAndReplace guarded by expected status"| M2
+  V3 -.->|"same txn"| M6
+
+  F4 --> M1
+  F4 --> M7
+
+  M3 --> ENG["computeAvailability<br/>expand → merge → subtract → chop"]
+  M4 --> ENG
+  M2 -->|"active statuses only"| ENG
+  ENG --> C5
+  C5 -->|"GraphQL availabilityFor"| T4
+
+  M6 -.->|"relay claims batch"| C6
+  C6 -.->|"worker"| OUT
+  M2 --> T4 --> T5 --> UI["Rendered calendar<br/>viewer time + clinic time"]
+  M5 -->|"DataLoader batch findByIds"| T4
+
+  classDef s fill:#EEF2F5,stroke:#5A6875
+  classDef a fill:#FAF0E2,stroke:#9A5B0B
+  class C1,C2,C3,C4,C5,C6,M1,M2,M3,M4,M5,M6,M7 s
+  class OUT,C6 a
+</pre>
+    <p class="plate-cap">Plate 04 — entity journeys. Every Redis key and Mongo collection in the system appears here.</p>
+  </div>
+
+  <h3>Traced flows, in the arrow notation you asked for</h3>
+
+  <h4>Login</h4>
+  <div class="trace">User → {email, password}
+  → React LoginPage → useLogin mutation
+  → POST /v1/auth/login  (credentials: include)
+  → Vite proxy / Cloud Run
+  → cookie-parser → CsrfMiddleware (Origin check)
+  → AuthGuard: @Public, no session required
+  → ZodValidationPipe: loginSchema
+  → AuthService.login
+      → LoginRateLimiter.isBlocked   [Redis GET ×2]   → blocked? 429
+      → UserRepository.findByEmail   [Mongo users, normalised email]
+      → argon2.verify(hash ?? dummyHash, password)    ← constant work on miss
+      → failure: recordFailure       [Redis MULTI INCR+EXPIRE ×2] → 401
+      → success: clear counters      [Redis DEL ×2]
+      → generateSessionId: randomBytes(32).base64url  ← brand-new id, always
+      → SessionStore.create          [Redis SET session:sha256(id) EX 604800]
+  → Set-Cookie: sid=… HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=604800
+  → {role, profileId}                ← never userId, never email
+  → queryClient.setQueryData(['session'])
+  → App re-renders: patient → BookingFlow, doctor → DoctorInbox</div>
+
+  <h4>Counter-proposal accepted by the patient</h4>
+  <div class="trace">Patient → click "Accept 10:30"
+  → POST /v1/appointments/{id}/patient-accept   Cookie: sid
+  → AuthGuard → actor {role: patient, profileId: patient-1}
+  → AppointmentService.applyEvent
+      → repository.findById            [Mongo appointments]
+      → transition(current, {type:'patientAccept'}, actor)
+          → isParty? patientId === actor.profileId, else NOT_A_PARTY → 404
+          → COUNTER_PROPOSED allows patientAccept for role patient?  yes
+          → returns ConfirmedAppointment{ confirmedSlot = proposedSlot }
+      → repository.update(next, expectedStatus='COUNTER_PROPOSED')
+          → findOneAndReplace({_id, status: expected})   ← optimistic concurrency
+          → insertMany(outbox: appointment.confirmed)    ← same transaction
+      → cache.invalidate(doctorId)     [Redis INCR avail-version]
+  → 200 AppointmentDto{ status: CONFIRMED, startsAt = proposed }
+  → invalidate calendar → GraphQL refetch → both parties' views converge on next poll</div>
+
+  <div class="note">
+    <span class="note-label">Why the DTO differs from the domain model</span>
+    <p>The domain is a discriminated union — <code>proposedSlot</code> is non-optional on <code>COUNTER_PROPOSED</code> and does not exist on the other variants, so "a counter-proposal with no proposed time" is <em>unrepresentable</em>. The wire DTO flattens this into nullable fields, because clients want a stable shape. Both mappings live in one place per surface: <code>toAppointmentDto</code> for REST, <code>toGql</code> for GraphQL.</p>
+  </div>
+</section>
+
+<!-- ============================= 05 ============================= -->
+<section id="d5">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Event catalogue</h2></div>
+
+  <div class="plate">
+<pre class="mermaid">
+graph TB
+  subgraph sync["Synchronous — emitted by a user action"]
+    E1["HTTP request<br/>emitter: browser · consumer: Nest router"]
+    E2["Domain transition<br/>emitter: controller · consumer: state machine"]
+    E3["Cache hit / miss<br/>emitter: AvailabilityCache · consumer: AvailabilityService"]
+    E4["Cache invalidation<br/>emitter: AppointmentService · consumer: version key"]
+    E5["GraphQL PubSub publish<br/>emitter: resolver · consumer: in-process subscribers only"]
+  end
+
+  subgraph async["Asynchronous"]
+    A1["Outbox row written<br/>emitter: repository, in txn"]
+    A2["Relay tick — every 1000ms<br/>emitter: setInterval"]
+    A3["Job added<br/>emitter: OutboxRelay · jobId = messageId"]
+    A4["Job active<br/>consumer: BullMQ Worker"]
+    A5["Job completed<br/>removeOnComplete count 1000"]
+    A6["Job failed<br/>5 attempts, exp backoff from 1s, kept for inspection"]
+    A7["Reminder scheduled<br/>delay = startsAt − 24h − now"]
+    A8["Claim expiry — 30s<br/>consumer: next relay tick re-claims"]
+    A9["Outbox TTL — 7d after publish<br/>consumer: Mongo TTL monitor"]
+  end
+
+  subgraph life["Lifecycle & platform"]
+    L1["Process start → Zod env parse"]
+    L2["Startup probe /health/live"]
+    L3["Liveness probe /health/live — 30s"]
+    L4["Readiness /health — pings Mongo + Redis"]
+    L5["SIGTERM / SIGINT"]
+    L6["Force-exit timer — 8000ms"]
+    L7["CI push → pipeline"]
+    L8["Deploy: migrate job → replace service"]
+    L9["Rollback: route traffic to previous revision"]
+  end
+
+  E1 --> E2 --> A1
+  E2 --> E4
+  E1 --> E3
+  E2 --> E5
+  A1 --> A2 --> A3 --> A4
+  A4 --> A5
+  A4 --> A6
+  A6 -->|"retry"| A4
+  A2 -.->|"relay crashed mid-batch"| A8 --> A2
+  A5 --> A9
+  E2 -.-> A7
+  L1 --> L2 --> L3
+  L4 -->|"503 → stop routing"| L3
+  L5 --> L6
+  L7 --> L8 --> L9
+
+  classDef s fill:#E4F2F3,stroke:#0E7C86
+  classDef a fill:#FAF0E2,stroke:#9A5B0B
+  classDef l fill:#EEF2F5,stroke:#5A6875
+  class E1,E2,E3,E4,E5 s
+  class A1,A2,A3,A4,A5,A6,A7,A8,A9 a
+  class L1,L2,L3,L4,L5,L6,L7,L8,L9 l
+</pre>
+    <p class="plate-cap">Plate 05 — every event the system can produce, and who consumes it.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Event</th><th>Emitter</th><th>Consumer</th><th>What happens next</th></tr></thead>
+    <tbody>
+      <tr><td><code>appointment.requested</code></td><td>Repository, inside the booking transaction</td><td>OutboxRelay → <code>notifications</code> queue</td><td>Worker POSTs to the provider with <code>Idempotency-Key = messageId</code></td></tr>
+      <tr><td><code>appointment.confirmed</code> / <code>.declined</code> / <code>.cancelled</code> / <code>.counter_proposed</code> / <code>.completed</code></td><td>Same, on every state transition</td><td>Same</td><td>One notification per state change; dedup at two layers (BullMQ <code>jobId</code>, provider <code>Idempotency-Key</code>)</td></tr>
+      <tr><td>Relay poll tick</td><td><code>setInterval(…, 1000).unref()</code></td><td><code>OutboxRelay.publishPending</code></td><td>Claims ≤50 rows via <code>findOneAndUpdate</code> with a 30s <code>claimedUntil</code>, enqueues, marks published</td></tr>
+      <tr><td>Enqueue failure</td><td>Relay</td><td><code>recordFailure</code></td><td><code>$inc attempts</code>, claim released immediately so the next tick retries</td></tr>
+      <tr><td>Job failed</td><td>BullMQ</td><td><code>worker.on('failed')</code></td><td>Logged at <code>warn</code>; retried up to 5 times with exponential backoff; retained for inspection</td></tr>
+      <tr><td>Reminder due</td><td>BullMQ delayed job, <code>jobId = reminder:{appointmentId}</code></td><td>— <strong>no worker consumes <code>reminders</code></strong></td><td>See Open questions. The scheduler and the deterministic <code>jobId</code> (re-scheduling replaces rather than duplicates) exist; the consumer does not.</td></tr>
+      <tr><td>Cache miss</td><td><code>AvailabilityCache.get</code></td><td><code>AvailabilityService</code></td><td>Recompute from Mongo, write back with a 60s TTL under the current version</td></tr>
+      <tr><td>Cache invalidation</td><td>Every appointment write</td><td>Version key</td><td><code>INCR</code> — old entries become unreachable and expire on their own. No key scan, no delete storm.</td></tr>
+      <tr><td>Redis unavailable</td><td>ioredis</td><td>Cache: caught and logged. Session/lock: propagates</td><td>Cache degrades to always-miss; auth fails closed</td></tr>
+      <tr><td>Readiness failure</td><td><code>/health</code></td><td>Orchestrator</td><td>503 → stop routing to this instance. Liveness deliberately checks <em>nothing</em> external, so a database blip doesn't restart every instance at once.</td></tr>
+      <tr><td>SIGTERM</td><td>Cloud Run / <code>docker stop</code></td><td><code>shutdown()</code></td><td>Stop accepting → drain in-flight → close workers → close Mongo/Redis → exit 0. Second SIGTERM ignored. Force-exit at 8s.</td></tr>
+      <tr><td>GraphQL subscription publish</td><td>Every mutation resolver</td><td>In-process <code>PubSub</code></td><td><strong>Not used in production</strong> — it doesn't fan out across instances, Cloud Run bills for idle connections, and there's no session affinity. The frontend polls at 10s instead.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================= 06 ============================= -->
+<section id="d6">
+  <div class="sec-head"><span class="sec-num">06</span><h2>Module breakdown</h2></div>
+
+  <div class="plate">
+<pre class="mermaid">
+graph TB
+  CFG["ConfigModule<br/>Zod-validated env, ENV symbol"]
+  INF["InfraModule @Global<br/>MongoService · RedisService"]
+  LOG["LoggerModule — nestjs-pino<br/>redacts cookie + authorization"]
+  HLT["HealthModule"]
+  AUTH["AuthModule @Global<br/>registers APP_GUARD + CsrfMiddleware"]
+  DOC["DoctorsModule @Global"]
+  AVA["AvailabilityModule"]
+  APT["AppointmentsModule"]
+  JOB["JobsModule"]
+  GQL["GraphQLApiModule"]
+  TST["TestSupportModule — only if MOCK_NOTIFICATIONS=1"]
+
+  CFG --> INF --> LOG --> HLT --> AUTH --> DOC --> AVA --> APT --> JOB --> GQL --> TST
+  AVA -.->|"imports"| APT
+  APT -.->|"imports"| GQL
+  DOC -.->|"repositories"| GQL
+  AUTH -.->|"AuthService for WS onConnect"| GQL
+  AVA -.->|"AvailabilityCache"| JOB
+
+  classDef core fill:#E4F2F3,stroke:#0E7C86
+  classDef feat fill:#FFFFFF,stroke:#5A6875
+  class CFG,INF,LOG core
+  class HLT,AUTH,DOC,AVA,APT,JOB,GQL,TST feat
+</pre>
+    <p class="plate-cap">Plate 06 — module import order. Order matters: AuthModule registers the global guard, so everything after it is protected by default.</p>
+  </div>
+
+  <h3>Auth</h3>
+  <p><strong>Purpose:</strong> establish identity and enforce that authorization is a domain rule, not a controller concern. <strong>Inputs:</strong> email/password, session cookie. <strong>Outputs:</strong> <code>Actor {userId, role, profileId}</code>. <strong>Dependencies:</strong> Redis, Mongo <code>users</code>, argon2.</p>
+  <ul>
+    <li><strong>Sessions over JWT.</strong> Opaque 256-bit ids in Redis. Consequences: instant revocation, no signing secret to rotate or leak, and a Redis round trip on every request. The stored key is <code>sha256(sid)</code> — a Redis dump or a leaked key listing does not yield usable session tokens.</li>
+    <li><strong>Two rate-limit counters.</strong> Per-email alone enables a lockout attack against a known user; per-IP alone misses password spraying. Per-IP is looser because offices and carriers share addresses. Both keys are hashed, so the store holds no PII.</li>
+    <li><strong>Timing.</strong> A missing user still costs an argon2 verify against a cached dummy hash, so response time doesn't reveal account existence. The rate limiter runs <em>first</em>, so an attacker can't spend the server's CPU on every attempt.</li>
+    <li><strong>Session fixation is structurally impossible</strong> — there is no pre-auth session to upgrade, and login always mints a fresh id.</li>
+    <li><strong>Bottleneck:</strong> argon2id at 19 MiB / t=2 is ~50ms of CPU per login. On a 1-vCPU instance with concurrency 80, a login burst is the CPU ceiling. <strong>Scaling:</strong> logins are rare relative to reads; if it mattered, move auth to its own service or raise <code>maxScale</code>.</li>
+    <li><strong>Monitoring:</strong> currently only request logs. Missing: a counter on 401/429 rates, which is the actual attack signal.</li>
+  </ul>
+
+  <h3>Appointments</h3>
+  <p><strong>Purpose:</strong> the booking lifecycle. <strong>The state machine is the heart of the system</strong> and is worth being able to draw from memory.</p>
+
+  <div class="plate">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> REQUESTED: patient requests
+  REQUESTED --> CONFIRMED: doctor accept
+  REQUESTED --> DECLINED: doctor decline
+  REQUESTED --> COUNTER_PROPOSED: doctor propose (≠ requested slot)
+  REQUESTED --> CANCELLED: doctor or patient cancel
+  COUNTER_PROPOSED --> CONFIRMED: patient patientAccept → confirmedSlot = proposedSlot
+  COUNTER_PROPOSED --> DECLINED: patient patientDecline
+  COUNTER_PROPOSED --> CANCELLED: doctor or patient cancel
+  CONFIRMED --> COMPLETED: doctor complete (only after start time)
+  CONFIRMED --> CANCELLED: doctor or patient cancel
+  DECLINED --> [*]
+  CANCELLED --> [*]
+  COMPLETED --> [*]
+</pre>
+    <p class="plate-cap">Plate 06b — the transition table. Each edge is also keyed by <em>role</em>: a patient cannot <code>accept</code>, a doctor cannot <code>patientAccept</code>.</p>
+  </div>
+
+  <ul>
+    <li>The table is <code>as const satisfies { [S in Status]: { [P in Party]: readonly EventsForParty&lt;S,P&gt;[] } }</code> — the runtime table and the compile-time type are checked against each other, so they cannot drift.</li>
+    <li>Three refusal reasons, deliberately distinct: <code>NOT_A_PARTY</code> → <strong>404</strong> (not 403 — a 403 confirms the appointment exists, which is an enumeration oracle); <code>ACTOR_NOT_PERMITTED</code> → 403; <code>ILLEGAL_TRANSITION</code> → 409.</li>
+    <li><strong>Two layers of concurrency control.</strong> The Redis lock is the cheap first line, turning most races into a fast 409. The partial unique index is the guarantee — it holds even if Redis is down, the lock TTL expires mid-request, or two instances race. Updates additionally use <code>findOneAndReplace({_id, status: expected})</code> as optimistic concurrency, so two doctors clicking Accept simultaneously produce one success and one 409.</li>
+    <li><strong>Why the index is partial:</strong> filtered to <code>REQUESTED | COUNTER_PROPOSED | CONFIRMED</code>. Without the filter, a cancelled 09:00 slot could never be rebooked. This is also why Cosmos DB's Mongo API is not a drop-in — it doesn't support partial indexes, so migrating clouds would be a redesign of the correctness mechanism, not a config change.</li>
+    <li><strong>Bottleneck:</strong> lock contention is per <code>(doctorId, startsAt)</code>, so it only serialises genuine conflicts. <strong>Failure:</strong> a crash between commit and cache invalidation leaves stale availability for ≤60s.</li>
+  </ul>
+
+  <h3>Availability</h3>
+  <p><strong>Purpose:</strong> compute bookable slots from recurring rules, minus exceptions, minus held slots. <strong>Pure function at the core</strong> — <code>computeAvailability</code> does zero I/O, which is why 165 unit tests can cover DST behaviour with no database.</p>
+  <ul>
+    <li><strong>Pipeline:</strong> <code>expandRules</code> → <code>mergeIntervals</code> → <code>subtractIntervals</code> → <code>chopIntoSlots</code>.</li>
+    <li><strong>DST handling.</strong> Rules are stored as wall-clock time plus an IANA zone, never an offset. Expansion steps <code>plus({days: 1})</code> rather than adding 24 hours, because a local day is 23 or 25 hours across a transition. Non-existent local times (spring forward) are skipped by default, with an opt-in <code>shift</code> policy; ambiguous times (fall back) resolve to the first occurrence, and that choice is asserted in a test so a Luxon upgrade can't change it silently. On a fall-back day a 09:00–13:00 block is genuinely five real hours — the arithmetic gets that right for free because it works on instants.</li>
+    <li><strong>Cache:</strong> versioned keys, 60s TTL. Invalidation is <code>INCR</code> on a version counter — old entries become unreachable instantly and expire naturally. No <code>SCAN</code>, no delete storm, and it's safe under concurrency.</li>
+    <li><strong>Bottleneck:</strong> a wide range with many rules is O(rules × days). Capped at 90 days by the request schema. <strong>Failure:</strong> cache errors are caught and logged; the system degrades to always computing.</li>
+  </ul>
+
+  <h3>Outbox &amp; Jobs</h3>
+  <ul>
+    <li><strong>The problem it solves:</strong> writing to the database and publishing to a queue are two systems. Do them separately and a crash between them either loses the notification or sends one for a booking that rolled back. The outbox row is written <em>in the same Mongo transaction</em> as the appointment, so the two facts commit together.</li>
+    <li><strong>At-least-once, deduplicated twice.</strong> The relay claims with a 30s TTL and marks published after enqueueing — a crash in between means a re-send. BullMQ's <code>jobId = messageId</code> and the provider's <code>Idempotency-Key</code> both absorb it.</li>
+    <li><strong>Cleanup:</strong> a TTL index on <code>publishedAtDate</code> drops published rows after 7 days, so the collection doesn't grow without bound.</li>
+    <li><strong>Bottleneck:</strong> <code>claimUnpublished</code> issues one <code>findOneAndUpdate</code> per message — 50 round trips per tick. Fine at this volume; the fix at scale is a bulk claim with a claim token.</li>
+    <li><strong>Scaling:</strong> multiple instances run the relay concurrently and that is safe — the claim is atomic. Throughput scales with instance count, which is a happy accident of the single-deployable design rather than a plan.</li>
+  </ul>
+
+  <h3>GraphQL</h3>
+  <ul>
+    <li><strong>Why both surfaces:</strong> the calendar view needs availability + appointments + doctor details in one round trip — that's a GraphQL query. Booking and transitions are commands with idempotency semantics and RFC 7807 errors — those are REST. The frontend genuinely uses both.</li>
+    <li><strong>Guards, because the client composes the query:</strong> depth limit 7 (custom validation rule, handles fragment cycles), complexity limit 1000 (Apollo plugin, rejected at <code>didResolveOperation</code> — before any resolver runs). Introspection off in production.</li>
+    <li><strong>N+1:</strong> DataLoader per request batches <code>doctor</code>/<code>patient</code> lookups into one <code>$in</code> query. There's a <code>QueryCounter</code> on the repositories specifically so a test can assert the real round-trip count.</li>
+    <li><strong>Authorization is not duplicated.</strong> Both surfaces call the same <code>AppointmentService</code>, and the state machine does the checking. <code>appointments</code> takes no <code>doctorId</code> argument — the server scopes it to the session, so passing one is now a schema validation error rather than a silently-ignored filter.</li>
+    <li><code>autoSchemaFile: true</code> in production (in-memory) rather than a file path, because Cloud Run's filesystem is read-only and a non-root user can't write <code>schema.gql</code>. This was a real bug caught by running the image in CI, not by any test.</li>
+  </ul>
+
+  <h3>Shared kernel</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Module</th><th>Responsibility</th><th>Notable detail</th></tr></thead>
+    <tbody>
+      <tr><td><code>shared/intervals</code></td><td>Half-open interval algebra</td><td>Pure; merge/subtract/chop underpin all availability</td></tr>
+      <tr><td><code>shared/time</code></td><td>Recurring rule expansion</td><td>The DST logic; gap policies <code>skip</code> and <code>shift</code></td></tr>
+      <tr><td><code>shared/http</code></td><td>RFC 7807 problem+json + Zod pipe</td><td><code>@Catch()</code> everything; rethrows for GraphQL so Apollo formats its own errors. Unhandled errors log the detail and return a bare 500 — never the message.</td></tr>
+      <tr><td><code>shared/locking</code></td><td>Redis lock</td><td>Release is a Lua compare-and-delete, so a lock that expired and was re-acquired isn't deleted by the old holder</td></tr>
+      <tr><td><code>shared/idempotency</code></td><td>Claim / complete / release</td><td><code>SET NX</code> claim; stable JSON hash so key order in the body doesn't change the hash</td></tr>
+      <tr><td><code>shared/result</code></td><td><code>Result&lt;T, E&gt;</code></td><td>Expected failures are values, not exceptions — the compiler forces the caller to handle them</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================= 07 ============================= -->
+<section id="d7">
+  <div class="sec-head"><span class="sec-num">07</span><h2>Sequence diagrams — major flows</h2></div>
+
+  <h3>Login and session resolution</h3>
+  <div class="plate">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant R as LoginPage
+  participant MW as Csrf + AuthGuard
+  participant AC as AuthController
+  participant AS as AuthService
+  participant RL as LoginRateLimiter
+  participant UR as MongoUserRepository
+  participant SS as RedisSessionStore
+
+  U->>R: email + password, submit
+  R->>MW: POST /v1/auth/login
+  MW->>MW: Origin allowed? Sec-Fetch-Site ≠ cross-site?
+  MW->>AC: @Public — no session required
+  AC->>AS: login(email, password, clientIp)
+  AS->>RL: isBlocked(email, ip)
+  RL-->>AS: false
+  AS->>UR: findByEmail(normalised)
+  UR-->>AS: user | null
+  AS->>AS: argon2.verify(hash ?? dummyHash, password)
+  alt invalid
+    AS->>RL: recordFailure — MULTI INCR+EXPIRE ×2
+    AS-->>AC: {ok:false, INVALID_CREDENTIALS}
+    AC-->>R: 401 problem+json — same message either way
+  else valid
+    AS->>RL: clear(email, ip)
+    AS->>AS: randomBytes(32) → base64url
+    AS->>SS: SET session:sha256(id) EX 604800
+    AS-->>AC: {ok:true, sessionId, actor}
+    AC-->>R: 200 + Set-Cookie sid — HttpOnly, SameSite=Lax, Secure
+  end
+  R->>R: setQueryData(['session']) → re-render by role
+</pre>
+    <p class="plate-cap">Plate 07a — login. Note the failure path costs the same as success.</p>
+  </div>
+
+  <h3>Full lifecycle: request → counter-propose → accept</h3>
+  <div class="plate">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor P as Patient
+  actor D as Doctor
+  participant API as API
+  participant SM as State machine
+  participant MG as MongoDB
+  participant OB as Outbox + relay
+  participant WK as Worker → provider
+
+  P->>API: POST /v1/appointments {doctorId, 09:00–09:30}
+  API->>SM: new appointment → REQUESTED
+  API->>MG: txn: insert appointment + outbox appointment.requested
+  OB-->>WK: notify doctor
+  API-->>P: 201 REQUESTED
+
+  Note over D: doctor polls every 10s, sees the request
+  D->>API: POST /v1/appointments/{id}/propose {10:30–11:00}
+  API->>SM: REQUESTED + propose by doctor → allowed
+  SM->>SM: reject if proposed slot === requested slot
+  API->>MG: txn: replace guarded by status=REQUESTED + outbox counter_proposed
+  Note over MG: both 09:00 and 10:30 are now held by this appointment
+  OB-->>WK: notify patient
+  API-->>D: 200 COUNTER_PROPOSED
+
+  P->>API: POST /v1/appointments/{id}/patient-accept
+  API->>SM: COUNTER_PROPOSED + patientAccept by patient → allowed
+  SM->>SM: confirmedSlot = proposedSlot; original slot released
+  API->>MG: txn: replace guarded by status=COUNTER_PROPOSED + outbox confirmed
+  OB-->>WK: notify both parties
+  API-->>P: 200 CONFIRMED — startsAt is now 10:30
+
+  Note over P,D: next 10s poll converges both views
+</pre>
+    <p class="plate-cap">Plate 07b — the flow the e2e suite runs in two separate browser contexts, one cookie jar per party.</p>
+  </div>
+
+  <h3>Concurrent booking — the conflict path</h3>
+  <div class="plate">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant A as Client A
+  participant B as Client B
+  participant I1 as API instance 1
+  participant I2 as API instance 2
+  participant RD as Redis
+  participant MG as MongoDB
+
+  par same millisecond
+    A->>I1: POST /v1/appointments 09:00
+  and
+    B->>I2: POST /v1/appointments 09:00
+  end
+  I1->>RD: SET lock:slot:doctor-1:T NX PX 3000
+  I2->>RD: SET lock:slot:doctor-1:T NX PX 3000
+  RD-->>I1: OK
+  RD-->>I2: nil
+  I2-->>B: 409 contended — "that slot is being booked right now"
+  I1->>MG: txn insert — unique index accepts
+  MG-->>I1: committed
+  I1->>RD: EVAL — delete lock only if token matches
+  I1-->>A: 201 REQUESTED
+
+  Note over RD,MG: if Redis were down, both would reach Mongo
+  Note over MG: the second insert then fails E11000 → 409 slot-taken
+  Note over MG: the guarantee never depended on the lock
+</pre>
+    <p class="plate-cap">Plate 07c — two layers of defence. The lock is an optimisation; the index is the invariant.</p>
+  </div>
+
+  <h3>Background job and worker processing</h3>
+  <div class="plate">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant T as setInterval 1s
+  participant RL as OutboxRelay
+  participant MG as outbox collection
+  participant Q as Redis / BullMQ
+  participant W as Worker
+  participant EX as Provider
+  participant MSW as MSW interceptor (e2e only)
+
+  T->>RL: publishPending(now)
+  RL->>MG: findOneAndUpdate ×N — publishedAt null AND claim free<br/>set claimedUntil = now + 30s, sort createdAt asc
+  MG-->>RL: up to 50 messages
+  loop each message
+    RL->>Q: add(type, payload, {jobId: messageId, attempts:5, backoff exp 1s})
+    alt enqueue throws
+      RL->>MG: $inc attempts, release claim → retried next tick
+    end
+  end
+  RL->>MG: markPublished(ids) — unset claimedUntil, set publishedAtDate
+  Q-->>W: deliver
+  W->>EX: POST /v1/messages · Bearer key · Idempotency-Key: messageId
+  alt e2e run
+    EX-->>MSW: intercepted in-process, recorded, 202
+  end
+  alt 5xx or 429
+    EX-->>W: error marked retryable
+    W->>Q: throw → BullMQ retries with backoff
+  else 4xx
+    W->>Q: throw → retried too, then retained on the failed set
+  end
+  Note over MG: TTL index removes published rows after 7 days
+</pre>
+    <p class="plate-cap">Plate 07d — outbox relay and notification worker.</p>
+  </div>
+</section>
+
+<!-- ============================= 08 ============================= -->
+<section id="d8">
+  <div class="sec-head"><span class="sec-num">08</span><h2>Startup and shutdown</h2></div>
+
+  <div class="plate">
+<pre class="mermaid">
+graph TB
+  S0["docker compose up -d --wait"] --> S1["networks + volumes created<br/>mongo-data, redis-data"]
+  S1 --> S2["mongod --replSet rs0 starts"]
+  S1 --> S3["redis-server starts"]
+  S2 --> S4["healthcheck: rs.initiate on first boot,<br/>then poll hello().isWritablePrimary"]
+  S3 --> S5["healthcheck: redis-cli ping"]
+  S4 --> S6{"both healthy?"}
+  S5 --> S6
+  S6 -->|"--wait blocks until yes"| S7["npm run db:migrate<br/>005 migrations, ledger-guarded, idempotent"]
+  S7 --> S8["node dist/main.js"]
+
+  S8 --> B1["dotenv/config + reflect-metadata"]
+  B1 --> B2["startNotificationMock — no-op unless MOCK_NOTIFICATIONS=1"]
+  B2 --> B3["NestFactory.create — bufferLogs"]
+  B3 --> B4["Zod parses process.env<br/>FAIL FAST: bad config = failed deploy, not an incident"]
+  B4 --> B5["DI graph constructed in module order<br/>Config → Infra → Logger → Health → Auth → Doctors<br/>→ Availability → Appointments → Jobs → GraphQL"]
+  B5 --> B6["MongoClient constructed — lazy, connects on first use"]
+  B5 --> B7["ioredis constructed — lazyConnect"]
+  B5 --> B8["JobsRuntime ctor: start 1s relay poller (unref)<br/>+ open BullMQ notifications Worker"]
+  B5 --> B9["GraphQL schema built in memory"]
+  B6 --> B10["app.use(cookieParser)"]
+  B7 --> B10
+  B8 --> B10
+  B9 --> B10
+  B10 --> B11["useLogger(pino) · enableShutdownHooks<br/>· enableVersioning URI v1 · ProblemDetailsFilter"]
+  B11 --> B12["app.listen(PORT)"]
+  B12 --> B13["startupProbe /health/live — up to 60s of grace"]
+  B13 --> B14["READY — livenessProbe every 30s"]
+
+  B14 --> K0["SIGTERM or SIGINT"]
+  K0 --> K1{"already shutting down?"}
+  K1 -->|"yes"| K2["ignore — Cloud Run may send twice"]
+  K1 -->|"no"| K3["arm force-exit timer 8000ms, unref"]
+  K3 --> K4["app.close — stop accepting new connections<br/>LB health check fails, routing stops"]
+  K4 --> K5["drain in-flight requests"]
+  K5 --> K6["onApplicationShutdown hooks:<br/>clearInterval poller · worker.close<br/>· mongo.client.close · redis.quit"]
+  K6 --> K7["log 'Drained cleanly' → exit 0"]
+  K3 -.->|"timeout"| K8["log + exit 1 — self-inflicted exit still runs cleanup"]
+
+  classDef infra fill:#EEF2F5,stroke:#5A6875
+  classDef boot fill:#E4F2F3,stroke:#0E7C86
+  classDef down fill:#FAF0E2,stroke:#9A5B0B
+  class S0,S1,S2,S3,S4,S5,S6,S7 infra
+  class B1,B2,B3,B4,B5,B6,B7,B8,B9,B10,B11,B12,B13,B14,S8 boot
+  class K0,K1,K2,K3,K4,K5,K6,K7,K8 down
+</pre>
+    <p class="plate-cap">Plate 08 — cold start to ready state, and back down.</p>
+  </div>
+
+  <div class="note">
+    <span class="note-label">Two details worth volunteering unprompted</span>
+    <p><strong>CMD is <code>node</code>, not <code>npm start</code>.</strong> npm sits between the init process and node and does not forward SIGTERM to its child, so the graceful shutdown handler would never run and every deploy would kill in-flight requests. That one line is what makes all the draining logic in <code>main.ts</code> actually reachable — and CI asserts it by running <code>docker stop -t 15</code> and grepping the logs for <code>drained cleanly</code> plus exit code 0.</p>
+    <p><strong>Migrations run before the new revision, as a job, never at boot.</strong> Several instances starting at once would race each other. That ordering only works because every migration is backwards-compatible with the currently-running code — during a rollout both versions serve traffic. Destructive changes go in release N+1.</p>
+  </div>
+</section>
+
+<!-- ============================= 09 ============================= -->
+<section id="d9">
+  <div class="sec-head"><span class="sec-num">09</span><h2>Production architecture</h2></div>
+
+  <p>Solid boxes are configured today. Dashed boxes are the gap between this and a system I'd put real patients on — being able to name them precisely is more valuable in an interview than pretending they exist.</p>
+
+  <div class="plate">
+<pre class="mermaid">
+graph TB
+  U["Users — browsers worldwide"]
+
+  subgraph edgeL["Edge"]
+    DNS["scheduler.example — DNS"]
+    CDN["CDN + static SPA hosting<br/>NOT BUILT — see gaps"]
+    ARMOR["Cloud Armor / WAF<br/>rate limiting — NOT BUILT"]
+    LB["Cloud Run managed ingress<br/>HTTPS 443 · managed certificate · HTTP/2"]
+  end
+
+  subgraph runL["Compute — Cloud Run revision"]
+    I1["instance 1<br/>API + relay + worker"]
+    I2["instance 2"]
+    IN["… up to maxScale 10<br/>concurrency 80 each"]
+  end
+
+  subgraph netL["Private networking"]
+    VPC["Serverless VPC connector<br/>all egress — itself a scaling resource"]
+  end
+
+  subgraph dataL["Managed state"]
+    ATLAS[("MongoDB Atlas replica set<br/>primary + 2 secondaries<br/>PITR + daily snapshots")]
+    MEM[("Memorystore Redis<br/>HA tier + AOF")]
+  end
+
+  subgraph secL["Identity & secrets"]
+    SM["Secret Manager<br/>mongo-url · redis-url · notification-*"]
+    SAC["Service account — least privilege"]
+    WIF["Workload Identity Federation<br/>CI auth, no long-lived keys"]
+  end
+
+  subgraph obsL["Observability"]
+    LOGS["Cloud Logging<br/>Pino JSON parsed natively"]
+    MET["Cloud Monitoring<br/>request count · latency · instance count"]
+    UP["Uptime check → /health<br/>NOT BUILT"]
+    TR["Distributed tracing + request-id correlation<br/>NOT BUILT"]
+    ALERT["Alerting policies<br/>NOT BUILT"]
+  end
+
+  EXT["Notification provider"]
+
+  U --> DNS --> CDN -.-> LB
+  DNS --> ARMOR -.-> LB
+  LB --> I1 & I2 & IN
+  I1 & I2 & IN --> VPC --> ATLAS
+  VPC --> MEM
+  I1 & I2 & IN --> EXT
+  SM -.->|"injected at boot"| I1
+  SAC --> SM
+  WIF -.-> SAC
+  I1 & I2 & IN --> LOGS --> MET
+  MET -.-> ALERT
+  UP -.-> LB
+  TR -.-> LOGS
+
+  classDef built fill:#FFFFFF,stroke:#0E7C86,color:#0C2E31
+  classDef gap fill:#FBEBEB,stroke:#A32B2B,stroke-dasharray: 4 3,color:#5A1414
+  classDef store fill:#EEF2F5,stroke:#35485A
+  class LB,I1,I2,IN,VPC,SM,SAC,WIF,LOGS,MET,DNS,EXT built
+  class CDN,ARMOR,UP,TR,ALERT gap
+  class ATLAS,MEM store
+</pre>
+    <p class="plate-cap">Plate 09 — production topology. Red dashed = named, justified, not yet built.</p>
+  </div>
+
+  <h3>Scaling, layer by layer</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Layer</th><th>Today</th><th>First bottleneck</th><th>Next move</th></tr></thead>
+    <tbody>
+      <tr><td>API instances</td><td>Horizontal, 1→10, 80 concurrent each</td><td>argon2 CPU on login bursts; V8 single-threaded per instance</td><td>Raise maxScale; the ceiling exists on purpose so an autoscaler can't exhaust Mongo's connection pool — 100 instances × pool size is how serverless takes down its own database</td></tr>
+      <tr><td>Workers</td><td>Co-located, one per instance</td><td>Coupled to API scaling — a notification backlog can only be cleared by scaling the API</td><td><strong>Split into a second Cloud Run service</strong> from the same image with a worker-only entrypoint. This is the single highest-value architectural change.</td></tr>
+      <tr><td>MongoDB</td><td>Single-node locally, Atlas replica set in prod</td><td>Write throughput on <code>appointments</code>; the unique index serialises per <code>(doctor, slot)</code> only</td><td>Read preference <code>secondaryPreferred</code> for availability; shard on <code>doctorId</code> — the access pattern is already doctor-scoped</td></tr>
+      <tr><td>Redis</td><td>Single node</td><td>Single point of failure for sessions; cache and queue share a node</td><td>HA tier; separate the queue instance from the session/cache instance so a queue backlog can't evict sessions</td></tr>
+      <tr><td>Availability compute</td><td>60s cache, versioned invalidation</td><td>Cold cache × many doctors after every write</td><td>Precompute per doctor-week in a job; the engine is already a pure function, so this is a caching change, not a rewrite</td></tr>
+      <tr><td>VPC connector</td><td>Single connector, all egress</td><td>Its own throughput ceiling — can bottleneck while both API and database look healthy</td><td>Size it explicitly; monitor connector throughput. This is the GCP-specific trap that has no ECS Fargate equivalent.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Security posture</h3>
+  <ul>
+    <li><strong>Transport:</strong> TLS terminated at Cloud Run; datastores on private IPs, never publicly routable. Container runs as non-root <code>node</code>, asserted in CI.</li>
+    <li><strong>Session:</strong> HttpOnly (no JS access), SameSite=Lax, Secure by default — the flag defaults to the safe direction and an environment that needs it off must say so explicitly. Ids are hashed at rest in Redis.</li>
+    <li><strong>CSRF:</strong> SameSite=Lax is the primary control; the Origin and <code>Sec-Fetch-Site</code> checks are defence in depth. <code>ALLOWED_ORIGINS</code> never defaults to permissive — a security control that's off until someone remembers to turn it on isn't a control.</li>
+    <li><strong>Passwords:</strong> argon2id, 19 MiB / t=2 / p=1, at the OWASP floor. <code>needsRehash</code> exists so parameters can be raised later.</li>
+    <li><strong>Secrets:</strong> referenced from Secret Manager, never inlined — a connection string in YAML is a connection string in git history, and rotating it becomes a commit. CI authenticates via Workload Identity Federation, because a key that never expires is a key that eventually leaks.</li>
+    <li><strong>Information disclosure:</strong> unhandled exceptions log the detail and return a bare 500. Not-a-party returns 404, not 403. Login returns the same message and takes the same time whether or not the account exists.</li>
+    <li><strong>Supply chain:</strong> <code>npm ci</code> everywhere, so no build ever resolves a dependency tree that wasn't reviewed. Multi-stage build ships no compiler, no dev dependencies, no source.</li>
+    <li><strong>Gaps I'd name before being asked:</strong> no WAF or network-level rate limiting; no audit log of who changed which appointment; no secret rotation schedule; nothing enforces password strength on registration (there is no registration flow yet).</li>
+  </ul>
+
+  <h3>Observability</h3>
+  <ul>
+    <li><strong>Have:</strong> structured Pino JSON that Cloud Logging parses natively; <code>authorization</code> and <code>cookie</code> redacted; <code>/health</code> excluded from request logging so probes don't bury real traffic; a readiness endpoint that reports per-dependency status and latency.</li>
+    <li><strong>Missing, in priority order:</strong> (1) a request id propagated into every log line and returned in the problem+json body, so a user-reported error maps to a server log entry — this is the highest-leverage missing piece; (2) uptime checks alerting on <code>/health</code> rather than raw error rate, because readiness fails before users notice; (3) queue depth and outbox lag metrics, which are the only signals that would catch a stalled relay; (4) distributed tracing.</li>
+  </ul>
+</section>
+
+<hr class="rule">
+
+<!-- ============================= walkthrough ============================= -->
+<section id="walkthrough">
+  <div class="sec-head"><span class="sec-num">→</span><h2>Interview walkthrough</h2></div>
+
+  <p class="kicker">Spoken, start to finish, to a Senior Staff Engineer. Roughly twelve minutes at a normal pace. Lead with the invariants — the architecture is downstream of them.</p>
+
+  <h3>1 · Open with the problem, not the stack</h3>
+  <p>"It's a doctor appointment scheduler. A patient requests a slot, the doctor accepts, declines, or proposes a different time, and the patient accepts or declines that. Either side can cancel, and everyone gets notified.</p>
+  <p>Two properties drove every structural decision. First: no double-booking, ever, including two requests in the same millisecond. Second: correct timezone handling — doctors and patients in different zones, with recurring availability that survives daylight-saving transitions without silently shifting. Nearly everything else in the design follows from those two."</p>
+
+  <h3>2 · The shape</h3>
+  <p>"One deployable: a Node 22 process running NestJS. It serves REST at <code>/v1</code> and GraphQL at <code>/graphql</code>, and it also hosts a BullMQ worker and an outbox relay poller. Behind it, MongoDB as the system of record and Redis doing six different jobs. The frontend is a React 19 SPA with TanStack Query, served same-origin — Vite's proxy in development, Cloud Run in production — so cookie behaviour in dev matches production exactly.</p>
+  <p>Internally it's hexagonal: <code>api</code> is transport, <code>application</code> orchestrates, <code>domain</code> is pure with zero I/O, <code>persistence</code> holds adapters injected behind Symbol tokens. That layering is what makes 165 unit tests possible with no database — the interval algebra, the DST expansion, and the state machine are all pure functions."</p>
+
+  <h3>3 · The double-booking guarantee — lead with this</h3>
+  <p>"The guarantee lives in the database, not in application code. There's a partial unique index on <code>(doctorId, startsAt)</code>, filtered to the active statuses. Partial matters: without the filter a cancelled 09:00 slot could never be rebooked.</p>
+  <p>In front of that there's a Redis lock keyed on doctor and slot start, but I'd call that an optimisation, not the guarantee. It turns most races into a fast 409 instead of a wasted transaction. If Redis is down, both requests reach Mongo and the second gets a duplicate-key error, which the adapter translates into <code>SlotTakenError</code> and then a 409. Same outcome, different path.</p>
+  <p>State transitions add a third layer: <code>findOneAndReplace</code> guarded on the expected status, which is optimistic concurrency. Two doctors clicking Accept at once produce one 200 and one 409.</p>
+  <p>The e2e suite proves this with two real browser contexts hitting the same slot — I wanted evidence, not an argument."</p>
+
+  <h3>4 · Timezones</h3>
+  <p>"Availability is stored as recurring rules: weekday plus wall-clock time plus an IANA zone. Never an offset — an offset is a fact about a moment, not about a clinic.</p>
+  <p>Expansion steps day by day with Luxon's <code>plus({days: 1})</code>, not by adding 24 hours, because a local day is 23 or 25 hours across a transition. Non-existent times on spring-forward are skipped by default, with an opt-in shift policy. Ambiguous times on fall-back resolve to the first occurrence, and I assert that in a test so a library upgrade can't change it silently.</p>
+  <p>There's a nice consequence: on a fall-back day, a 09:00–13:00 block really is five hours of real time. The arithmetic gets that right for free, because it works on instants rather than wall-clock durations.</p>
+  <p>The e2e suite pins the browser to <code>America/New_York</code> while the clinic is in <code>Europe/Lisbon</code>, so every test exercises the cross-timezone path rather than the trivial same-zone case."</p>
+
+  <h3>5 · Authorization as a domain rule</h3>
+  <p>"Authorization isn't a controller concern here. The state machine decides both which transitions are legal <em>and</em> which party may make them — a patient can't <code>accept</code>, a doctor can't <code>patientAccept</code>. The transition table is declared once as a const that must satisfy a mapped type, so the runtime table and the compile-time type can't drift.</p>
+  <p>That's why both REST and GraphQL enforce identical rules with zero duplication: they both call the same service, and the domain does the checking.</p>
+  <p>One deliberate detail: 'you're not a party to this appointment' returns 404, not 403. A 403 confirms the appointment exists, which is an enumeration oracle."</p>
+
+  <h3>6 · Sessions over JWT</h3>
+  <p>"Opaque 256-bit random ids stored in Redis, keyed by their SHA-256 hash. Three reasons over a JWT: instant revocation; no signing secret to manage, and a secret that exists is a secret that can leak; and the cookie can be unsigned, because a tampered value simply fails to resolve.</p>
+  <p>The cost is a Redis round trip per request. At this scale that's the right trade — I'd revisit it if the session store became a hot path across many services.</p>
+  <p>The login path has three details I'd want to be asked about: rate limiting runs first, before any expensive work, so an attacker can't spend our CPU on every attempt. A missing user still costs a full argon2 verify against a cached dummy hash, so timing doesn't reveal account existence. And there are two rate-limit counters — per-email alone lets you lock a known user out, per-IP alone misses password spraying, and per-IP is looser because offices share addresses.</p>
+  <p>Session fixation is structurally impossible: there's no pre-auth session to upgrade, and login always mints a fresh id."</p>
+
+  <h3>7 · Why both REST and GraphQL</h3>
+  <p>"Not for the sake of it. The calendar view needs availability, appointments, and doctor details in one round trip — that's genuinely a GraphQL query, and the frontend uses it. Booking and transitions are commands with idempotency keys and RFC 7807 errors — those are REST.</p>
+  <p>GraphQL gets guards because the client composes the query: depth limit 7, complexity limit 1000 rejected before any resolver runs, introspection off in production, and DataLoader per request to kill N+1. There's a query counter on the repositories specifically so a test can assert the real round-trip count rather than trusting that batching works."</p>
+
+  <h3>8 · The outbox — the async story</h3>
+  <p>"Writing to the database and publishing to a queue are two systems. Do them separately and a crash in between either loses the notification or sends one for a booking that rolled back.</p>
+  <p>So the outbox row is written in the <em>same Mongo transaction</em> as the appointment. That's also why Mongo runs as a replica set even locally — multi-document transactions need one.</p>
+  <p>A poller claims batches with a 30-second lease and enqueues to BullMQ. Delivery is at-least-once and deduplicated twice: BullMQ's <code>jobId</code> is the message id, and the provider gets an <code>Idempotency-Key</code>. Published rows are cleaned up by a TTL index after seven days.</p>
+  <p>The relay is safe to run on every instance concurrently because the claim is atomic — which is a happy consequence of the single-deployable design rather than something I planned."</p>
+
+  <h3>9 · Deployment</h3>
+  <p>"CI is seven jobs. Lint and typecheck are separate so a type error and a lint error both get reported in one run instead of the second hiding behind the first. Integration tests use Testcontainers on random ports so they're safe alongside other jobs. E2E brings up real Mongo and Redis with <code>--wait</code> so Playwright never races a replica set that's still electing a primary.</p>
+  <p>The build job verifies the <em>image</em>, not just that it compiled — it asserts the container runs as non-root, that it boots and answers <code>/health</code>, and that <code>docker stop</code> produces a clean drain with exit 0. Two real bugs came out of that: msw being statically imported and pruned in production so the image crashed on boot, and GraphQL writing <code>schema.gql</code> at startup, which fails for a non-root user on a read-only filesystem. Neither was caught by any test — only by running the container.</p>
+  <p>Publishing is gated on everything and only from main.</p>
+  <p>In production it's Cloud Run: min 1 instance so nobody pays for a cold start, max 10 so a traffic spike can't open unbounded Mongo connections — a hundred instances times a pool size is how a serverless autoscaler takes down the database it depends on. All egress goes through a VPC connector so the datastores are on private IPs.</p>
+  <p>The annotation I'd flag is <code>cpu-throttling: false</code>. Cloud Run throttles CPU outside a request by default, and my relay and worker run between requests. With throttling on, notifications arrive in bursts whenever someone loads a page — not an error, which is what makes it expensive to find.</p>
+  <p>Migrations run before the new revision, as a job, never on boot. Several instances starting at once would race. That only works because every migration is backwards-compatible with the running code — add in release N, remove in N+1."</p>
+
+  <h3>10 · Where it breaks, and what I'd do first</h3>
+  <p>"Four things, in the order I'd fix them.</p>
+  <p><strong>The workers share the API's process.</strong> That's the one I'd change first: split them into a second Cloud Run service from the same image with a worker-only entrypoint. Right now a notification backlog can only be cleared by scaling the API, and a slow provider consumes CPU that requests need.</p>
+  <p><strong>No request-id correlation.</strong> Pino emits JSON that Cloud Logging parses, but there's no id threaded through logs and returned in the error body, so a user-reported error can't be mapped to a server log line. That's the highest-leverage missing observability piece, and it's small.</p>
+  <p><strong>Redis is a single point of failure for sessions.</strong> Lose it and everyone is logged out. HA tier, and I'd split the queue instance from the session instance so a queue backlog can't evict sessions.</p>
+  <p><strong>Availability compute is O(rules × days) on a cold cache.</strong> Bounded today by a 90-day cap in the request schema and a 60-second cache. At scale I'd precompute per doctor-week in a job — and because the engine is already a pure function, that's a caching change, not a rewrite.</p>
+  <p>And one thing I'd name before being asked: the reminder scheduler exists and enqueues delayed jobs, but nothing consumes the <code>reminders</code> queue yet. It's half-built, and I'd rather say that than have you find it."</p>
+
+  <h3>11 · Close</h3>
+  <p>"The through-line is that correctness properties are enforced at the lowest layer that can enforce them. Uniqueness is a database index, not a check-then-insert. Authorization is a domain rule, not a controller guard. Configuration is parsed once at boot and fails the deploy rather than the first request. Where I couldn't push a guarantee down a layer — like at-least-once notification delivery — I made the consequences idempotent instead."</p>
+
+  <h4>Likely follow-ups, and the honest answers</h4>
+  <div class="tw"><table>
+    <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+    <tbody>
+      <tr><td>"Why the Redis lock if the index already guarantees it?"</td><td>It doesn't add correctness — it reduces wasted transactions and gives a clearer error faster. I'd keep it, but I'd delete it before I'd delete the index.</td></tr>
+      <tr><td>"What if Redis dies?"</td><td>Sessions and locks fail hard — everyone is logged out, and bookings fall back to index enforcement. Cache and idempotency degrade gracefully: the cache treats errors as a miss, and idempotency loses replay protection, which is a real correctness regression I'd want an alert on.</td></tr>
+      <tr><td>"Why Mongo for something this relational?"</td><td>Fair challenge. Postgres with an exclusion constraint on a <code>tstzrange</code> would express the no-overlap invariant more directly and handle variable-length appointments, which the fixed-slot index doesn't. Mongo works because slots are a fixed grid — the constraint is equality on <code>startsAt</code>, not range overlap. If appointment lengths became variable, I'd move.</td></tr>
+      <tr><td>"How do both parties see updates?"</td><td>Polling at 10 seconds. There's a GraphQL subscription in the code but it's not used in production — the in-process PubSub doesn't fan out across instances, Cloud Run bills for idle connections, and there's no session affinity. Making it work means Redis PubSub plus affinity. An appointment request isn't a chat message.</td></tr>
+      <tr><td>"What's the weakest part?"</td><td>The worker co-location, and the missing request-id correlation. Also: no audit trail of who changed what, which for a clinical system is a real gap rather than a nice-to-have.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================= gaps ============================= -->
+<section id="gaps">
+  <div class="sec-head"><span class="sec-num">?</span><h2>Open questions</h2></div>
+
+  <p>Six things I could not determine from the codebase. I've flagged them rather than assuming, because each one changes what you'd say in an interview.</p>
+
+  <ol class="body">
+    <li><strong>How is the frontend deployed?</strong> Only the API has a Dockerfile and a Cloud Run service. There's no static hosting, CDN, or bucket configured, and no build output target. Is the SPA meant to be served by Cloud Storage + Cloud CDN, by Firebase Hosting, or from the API container itself? This also determines whether <code>ALLOWED_ORIGINS: https://scheduler.example</code> is same-origin with the API or genuinely cross-origin — which changes the CSRF story.</li>
+    <li><strong>Is the <code>reminders</code> queue intentionally unconsumed?</strong> <code>ReminderScheduler</code> enqueues delayed jobs with a deterministic <code>jobId</code>, but no <code>Worker</code> is opened for that queue and nothing calls <code>schedule()</code> from the appointment flow. Half-built and known, or an oversight?</li>
+    <li><strong>Who creates users?</strong> There's login, logout, and <code>me</code>, but no registration endpoint. Accounts exist only via migration 005's demo seed. Is registration out of scope, or admin-provisioned?</li>
+    <li><strong>Where do doctor and patient profile records come from?</strong> <code>doctors</code>, <code>patients</code>, and <code>availability_rules</code> are read by the app but nothing writes them outside tests — <code>saveSchedule</code> has no HTTP surface. Is schedule management deliberately deferred?</li>
+    <li><strong>Is the notification provider a real vendor?</strong> The URL defaults to <code>https://notifications.example</code>. If you have a specific one in mind (SendGrid, Twilio, Postmark), the retry semantics and the idempotency-header name would need checking against their actual API.</li>
+    <li><strong>Multi-doctor?</strong> The frontend hardcodes a fallback of <code>doctor-1</code> and reads <code>?doctorId=</code> from the query string; there's no doctor directory endpoint. Is single-clinic the intended scope, or is discovery just not built yet?</li>
+  </ol>
+
+  <p>Answer any of these and I'll fold the result into the relevant diagrams.</p>
+</section>
+
+<footer>
+  <p>Blueprint generated from the <code>feat/phase-10-auth-tailwind</code> branch. Cross-references: <code>DECISIONS.md</code> (36 decisions with alternatives and 100× failure modes), <code>INTERVIEW-NOTES.md</code> (the same material as 60-second spoken answers), <code>docs/cloud-mapping.md</code> (GCP → AWS → Azure, and where the analogy breaks).</p>
+</footer>
+</main>
+</div>

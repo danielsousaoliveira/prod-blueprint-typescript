@@ -1,0 +1,221 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to the same branch cancels the previous run. Without this, a branch pushed
+# three times in a minute burns three full pipelines and the first two are already stale.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # FAST SIGNALS — run in parallel, no dependencies between them.
+  #
+  # Lint and typecheck are independent, so they are separate jobs rather than sequential
+  # steps: a type error and a lint error are both reported in one run instead of the
+  # second hiding behind the first.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # Caches ~/.npm keyed by the lockfile hash — dependencies are only
+          # re-downloaded when package-lock.json actually changes.
+          cache: npm
+      # `npm ci` rather than `npm install`: installs exactly the lockfile and fails if
+      # package.json and the lockfile disagree, so CI can never silently resolve a
+      # different dependency tree than the one that was reviewed.
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # The e2e project has its own tsconfig and is not covered by the workspace
+      # typecheck — without this line the Playwright specs are never type-checked at all.
+      - run: npx tsc --noEmit -p e2e/tsconfig.json
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # Two runners: Jest for the API, Vitest for the web app. That is a real cost,
+      # accepted because Vitest shares Vite's transform pipeline — the alternative is a
+      # parallel Jest transform for JSX and ESM kept in step by hand.
+      #
+      # --coverage enforces the thresholds in jest.config.js, so a coverage regression
+      # fails the build rather than being noticed later.
+      - run: npm test --workspace=apps/api -- --coverage --ci
+      - run: npm test --workspace=apps/web
+
+  # ---------------------------------------------------------------------------
+  # SLOWER SIGNALS — gated behind the fast ones so a branch that does not compile does
+  # not spend container minutes.
+  # ---------------------------------------------------------------------------
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # No `services:` block needed — ubuntu-latest runners have a Docker daemon, and
+      # Testcontainers manages the container lifecycle itself on random ports, which is
+      # what makes it safe to run alongside other jobs.
+      - run: npm run test:integration
+
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      # Only the browser the config actually uses. `--with-deps` installs the system
+      # libraries Chromium needs, which are absent from the runner image.
+      - run: npx playwright install chromium --with-deps
+
+      # Real MongoDB (as a replica set — transactions need one) and Redis. `docker
+      # compose --wait` blocks until both healthchecks pass, so Playwright never races a
+      # database that is still electing a primary.
+      - run: docker compose up -d --wait
+
+      - run: npm run build --workspace=apps/api
+      - run: npm run db:migrate
+        env:
+          MONGO_URL: mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
+          MONGO_DB_NAME: scheduler_e2e
+
+      # Playwright starts the API and the web dev server itself (see webServer in
+      # playwright.config.ts) and waits for both to answer before running anything.
+      - run: npm run test:e2e
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # BUILD AND PUBLISH
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build image
+    runs-on: ubuntu-latest
+    # Deliberately NOT gated on `integration` or `e2e`: the image build should not wait
+    # on the slowest jobs when the fast signals already passed. The PUSH below is gated
+    # on everything, which is where it matters.
+    needs: [lint, typecheck, unit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          # Never push from a pull request — a PR from a fork must not be able to publish
+          # an image to the registry.
+          push: false
+          load: true
+          tags: scheduler-api:${{ github.sha }}
+          # GitHub Actions cache for Docker layers, so an unchanged dependency layer is
+          # not rebuilt on every run.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Verifying the IMAGE, not just that it built. Both of these were real bugs found
+      # by running the container rather than by any test:
+      #   - msw was statically imported and is pruned in production, so the image crashed
+      #     on boot;
+      #   - GraphQL wrote schema.gql at startup, which fails for a non-root user.
+      - name: Verify the image runs as non-root
+        run: |
+          user=$(docker run --rm scheduler-api:${{ github.sha }} id -un)
+          echo "container user: $user"
+          [ "$user" = "node" ] || { echo "expected non-root"; exit 1; }
+
+      - name: Verify the container boots and answers /health
+        run: |
+          docker compose up -d --wait
+          docker run -d --name api-smoke --network host \
+            -e PORT=8080 -e NODE_ENV=production \
+            -e MONGO_URL='mongodb://localhost:27017/?replicaSet=rs0&directConnection=true' \
+            -e MONGO_DB_NAME=scheduler_smoke \
+            -e REDIS_URL=redis://localhost:6379 \
+            scheduler-api:${{ github.sha }}
+          for i in $(seq 1 30); do
+            if curl -sf localhost:8080/health > /dev/null; then echo "healthy"; break; fi
+            sleep 2
+          done
+          curl -sf localhost:8080/health || { docker logs api-smoke; exit 1; }
+
+      # SIGTERM draining, asserted in CI rather than trusted. `docker stop` sends SIGTERM
+      # and waits; exit code 0 means the process drained and exited deliberately rather
+      # than being SIGKILLed.
+      - name: Verify graceful shutdown
+        run: |
+          docker stop -t 15 api-smoke
+          code=$(docker inspect api-smoke --format '{{.State.ExitCode}}')
+          docker logs api-smoke 2>&1 | grep -i "drained cleanly" || { echo "no clean drain"; exit 1; }
+          [ "$code" = "0" ] || { echo "expected exit 0, got $code"; exit 1; }
+
+  publish:
+    name: Publish image
+    runs-on: ubuntu-latest
+    # Everything must pass before anything is published. This is the gate; `build` above
+    # only proves the image is sound.
+    needs: [build, integration, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      # Workload Identity Federation rather than a long-lived service account key in a
+      # repository secret. A key that never expires is a key that eventually leaks.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # Placeholder — a real deployment authenticates here, then pushes to Artifact
+      # Registry and triggers the migration job BEFORE replacing the service. See
+      # docs/cloud-mapping.md for the ordering and why it matters.
+      - name: Publish (configure registry credentials to enable)
+        run: |
+          echo "Would push scheduler-api:${{ github.sha }} to Artifact Registry,"
+          echo "then run the migration job, then replace the Cloud Run service."

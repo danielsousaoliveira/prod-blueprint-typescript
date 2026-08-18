@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // Node 22+ target. ES2023 gives us Array.prototype.findLast etc. without polyfills.
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    // node16 rather than the legacy "CommonJS"/"Node" pair, which TypeScript 6
+    // deprecates and 7 removes. With no "type" field in package.json this still emits
+    // CommonJS — which NestJS wants — but resolves modules the way Node actually does,
+    // including the "exports" field that the legacy resolver ignores.
+    "module": "node16",
+    "moduleResolution": "node16",
+
+    // NestJS is decorator-driven; both of these are required for its DI to work.
+    // emitDecoratorMetadata is what lets Nest read constructor parameter types at
+    // runtime and inject the right provider.
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    "strict": true,
+
+    // --- The two strictness flags that go beyond `strict` ---
+    // noUncheckedIndexedAccess: `arr[i]` is typed `T | undefined`. This is deliberately
+    // chosen for the Phase 2 interval sweep algorithms, where indexing into a sorted
+    // array in a loop is exactly the pattern that produces off-by-one bugs. It is noisy;
+    // that noise is the point.
+    "noUncheckedIndexedAccess": true,
+    // exactOptionalPropertyTypes: `{ a?: string }` no longer accepts `{ a: undefined }`.
+    // Matters at the persistence boundary, where "field absent" and "field explicitly
+    // null" are different documents in MongoDB.
+    "exactOptionalPropertyTypes": true,
+
+    // Each file must be compilable in isolation — required by ts-jest (and by any
+    // single-file transpiler such as swc or esbuild) under the node16 module kind.
+    // It bans a few constructs that need whole-program knowledge, e.g. re-exporting a
+    // type without `export type`.
+    "isolatedModules": true,
+
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "declaration": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  }
+}

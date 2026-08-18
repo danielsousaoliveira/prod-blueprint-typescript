@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The browser build differs from the API's in three ways that matter:
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "noEmit": true,
+    // Decorators are a NestJS concern; the frontend has no use for them and enabling
+    // emitDecoratorMetadata here would only slow the build.
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/vite-env.d.ts", "vite.config.ts"]
+}

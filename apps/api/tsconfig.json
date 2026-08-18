@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    // Explicit rather than relying on ambient @types auto-discovery. Two reasons: tools
+    // that resolve typeRoots from a different working directory (ts-node) otherwise fail
+    // to find them, and pinning the list stops Jest's globals leaking into application
+    // code, where calling `describe` would be a mistake.
+    "types": ["node"],
+    // Declarations are for consumers of a LIBRARY. This is an application — nothing
+    // imports its types — so emitting .d.ts files just puts 50-odd unused files in the
+    // runtime image.
+    "declaration": false
+  },
+  "include": ["src/**/*.ts"],
+  // Test code is excluded from the BUILD (see tsconfig.spec.json, which includes it).
+  // Tests must not be compiled into dist/ or shipped in the container image.
+  //
+  // `*.contract.ts` is in this list because a shared contract SUITE is test code even
+  // though it is not itself a spec file — it calls describe/it and is imported by the
+  // specs that run it against each adapter.
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.contract.ts"]
+}

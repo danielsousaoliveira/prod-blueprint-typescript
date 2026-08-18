@@ -1,0 +1,47 @@
+services:
+  # MongoDB runs as a SINGLE-NODE REPLICA SET, not a standalone server.
+  #
+  # Why: multi-document transactions are only available on a replica set (they rely on
+  # the oplog). Phase 3 needs them for the booking write path and Phase 6 needs them for
+  # the transactional outbox — where the outbox row and the appointment must commit or
+  # roll back together. A standalone mongod would work fine right up until those phases
+  # and then fail with an error that does not obviously say "your topology is wrong",
+  # so we pay the setup cost now.
+  mongo:
+    image: mongo:7
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Initiate the replica set on first boot, then report healthy once this node has
+      # actually become primary. `hello().isWritablePrimary` is the real readiness
+      # signal — a replica set that exists but has not elected a primary rejects writes.
+      test: |
+        mongosh --quiet --eval '
+          try { rs.status() } catch (e) {
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] })
+          }
+          quit(db.hello().isWritablePrimary ? 0 : 1)
+        '
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mongo-data:
+  redis-data:

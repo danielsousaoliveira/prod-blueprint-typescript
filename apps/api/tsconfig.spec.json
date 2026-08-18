@@ -1,0 +1,23 @@
+{
+  // Test-only compiler config. Kept separate from tsconfig.json so that:
+  //   - `types` can pull in Jest globals without leaking `describe`/`it` into
+  //     application code, where calling them would be a mistake;
+  //   - the build config can EXCLUDE spec files, so tests are never compiled into
+  //     dist/ and never end up in the production container image.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["jest", "node"],
+    "noEmit": true,
+    // Widen rootDir to the package root so `test/` can sit alongside `src/`. Harmless
+    // here because this project emits nothing — rootDir only constrains output layout.
+    "rootDir": "."
+  },
+  // `exclude` MUST be restated. It is inherited from tsconfig.json, which excludes
+  // **/*.spec.ts for the build — and an inherited exclude wins over this file's include,
+  // so without this line the test project contains zero files and typechecks nothing
+  // while still exiting 0.
+  "exclude": ["node_modules", "dist"],
+  // `test/` holds shared harnesses (Testcontainers setup) that live outside src/ because
+  // they are not application code and must never be built.
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

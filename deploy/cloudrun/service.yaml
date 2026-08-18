@@ -1,0 +1,139 @@
+# Cloud Run service definition (Knative format).
+#
+# Deployed with:
+#   gcloud run services replace deploy/cloudrun/service.yaml --region=europe-west1
+#
+# Secrets are REFERENCED from Secret Manager, never inlined. A connection string in a
+# YAML file is a connection string in git history, and rotating it means a commit.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: scheduler-api
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # --- Scaling -------------------------------------------------------
+        # minScale 1 keeps one instance warm. Zero is cheaper, but a cold start pays for
+        # Nest bootstrapping plus a MongoDB handshake on the first request after idle —
+        # several seconds, on the request of whoever happened to arrive first.
+        autoscaling.knative.dev/minScale: '1'
+        # A ceiling exists so a traffic spike cannot open unbounded MongoDB connections.
+        # Each instance holds a connection pool; 100 instances x pool size is how a
+        # serverless autoscaler takes down the database it depends on.
+        autoscaling.knative.dev/maxScale: '10'
+
+        # --- Networking ----------------------------------------------------
+        # All egress through the VPC connector, so MongoDB and Redis are reachable on
+        # private IPs and never exposed publicly.
+        run.googleapis.com/vpc-access-connector: scheduler-connector
+        run.googleapis.com/vpc-access-egress: all-traffic
+
+        # CPU is throttled outside a request by default. The outbox relay polls on a
+        # timer and BullMQ workers process jobs BETWEEN requests, so without this they
+        # would run only while a request happens to be in flight — notifications would
+        # arrive in bursts whenever someone loaded the calendar.
+        #
+        # This is the single most important annotation here, and the one most likely to
+        # be missed: the symptom is "background jobs are mysteriously slow", not an error.
+        run.googleapis.com/cpu-throttling: 'false'
+    spec:
+      # Below the platform's hard limit, and above SHUTDOWN_TIMEOUT_MS so a draining
+      # instance finishes rather than being killed mid-drain.
+      timeoutSeconds: 300
+      containerConcurrency: 80
+      serviceAccountName: scheduler-api@PROJECT_ID.iam.gserviceaccount.com
+
+      containers:
+        - image: europe-west1-docker.pkg.dev/PROJECT_ID/scheduler/api:TAG
+          ports:
+            # Cloud Run injects PORT; the container must listen on it.
+            - name: http1
+              containerPort: 8080
+
+          resources:
+            limits:
+              cpu: '1'
+              memory: 512Mi
+
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: LOG_LEVEL
+              value: info
+            # Must stay comfortably under Cloud Run's 10-second SIGTERM grace period, or
+            # the platform SIGKILLs mid-drain and in-flight requests are dropped anyway.
+            - name: SHUTDOWN_TIMEOUT_MS
+              value: '8000'
+            - name: MONGO_DB_NAME
+              value: scheduler
+
+            - name: MONGO_URL
+              valueFrom:
+                secretKeyRef:
+                  name: scheduler-mongo-url
+                  key: latest
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: scheduler-redis-url
+                  key: latest
+            - name: NOTIFICATION_PROVIDER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: scheduler-notification-url
+                  key: latest
+            # Sessions live in Redis and are opaque, so there is no signing secret to
+            # mount here — see DECISIONS §31. Secure is left at its default of true,
+            # because Cloud Run terminates TLS.
+            - name: SESSION_TTL_SECONDS
+              value: '604800'
+            - name: ALLOWED_ORIGINS
+              value: 'https://scheduler.example'
+            - name: NOTIFICATION_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scheduler-notification-key
+                  key: latest
+
+          # --- Probes -------------------------------------------------------
+          # Startup probe first: it gives the container time to connect to MongoDB and
+          # Redis WITHOUT the liveness probe killing it for being slow to start. Without
+          # a startup probe, a slow dependency at boot looks like a hung process and the
+          # platform restarts it in a loop.
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 3
+            failureThreshold: 20
+
+          # Liveness checks the PROCESS only — /health/live deliberately touches no
+          # dependency. Pointing this at /health (which pings MongoDB) would restart
+          # every instance simultaneously during a database blip, turning a recoverable
+          # incident into a restart storm. See DECISIONS §6.
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+---
+# NOTE ON SUBSCRIPTIONS — resolving the question deferred since Phase 5.
+#
+# The GraphQL subscription is NOT used in production, and the frontend polls instead
+# (DECISIONS §27). Three reasons, all specific to this platform:
+#
+#   1. Cloud Run bills for the whole duration of an open connection, so idle WebSockets
+#      cost the same as busy ones.
+#   2. Request timeout caps a connection at 60 minutes; clients must reconnect anyway.
+#   3. No session affinity by default, and the in-process PubSub does not fan out across
+#      instances — a subscriber on instance A never sees an event published on B.
+#
+# Making subscriptions work here means Redis PubSub, session affinity, and accepting the
+# billing model. That is the right answer when something genuinely needs sub-second
+# updates. An appointment request is not a chat message, so it does not.
