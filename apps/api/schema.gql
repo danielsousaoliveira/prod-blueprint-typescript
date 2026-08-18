@@ -1,0 +1,96 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Appointment {
+  createdAt: String!
+  doctor: Doctor
+  doctorId: ID!
+  endsAt: String!
+  id: ID!
+  patient: Patient
+  patientId: ID!
+  proposedEndsAt: String
+  proposedStartsAt: String
+  requestedEndsAt: String!
+  requestedStartsAt: String!
+  startsAt: String!
+  status: AppointmentStatus!
+}
+
+"""Lifecycle state of an appointment."""
+enum AppointmentStatus {
+  CANCELLED
+  COMPLETED
+  CONFIRMED
+  COUNTER_PROPOSED
+  DECLINED
+  REQUESTED
+}
+
+type Availability {
+  doctorId: ID!
+  slots: [Slot!]!
+  timezone: String!
+}
+
+input AvailabilityInputGql {
+  doctorId: ID!
+  from: String!
+  to: String!
+}
+
+type Doctor {
+  appointments: [Appointment!]!
+  id: ID!
+  name: String!
+  specialty: String!
+
+  """IANA timezone identifier for the clinic."""
+  timezone: String!
+}
+
+type Mutation {
+  acceptAppointment(id: ID!): Appointment!
+  cancelAppointment(id: ID!, reason: String): Appointment!
+  completeAppointment(id: ID!): Appointment!
+  declineAppointment(id: ID!): Appointment!
+  patientAcceptProposal(id: ID!): Appointment!
+  patientDeclineProposal(id: ID!): Appointment!
+  proposeNewTime(id: ID!, input: ProposeInputGql!): Appointment!
+  requestAppointment(input: RequestAppointmentInputGql!): Appointment!
+}
+
+type Patient {
+  id: ID!
+  name: String!
+  timezone: String!
+}
+
+input ProposeInputGql {
+  endsAt: String!
+  startsAt: String!
+}
+
+type Query {
+  appointment(id: ID!): Appointment
+  appointments: [Appointment!]!
+  availabilityFor(input: AvailabilityInputGql!): Availability
+}
+
+input RequestAppointmentInputGql {
+  doctorId: ID!
+  endsAt: String!
+  startsAt: String!
+}
+
+type Slot {
+  endsAt: String!
+
+  """ISO 8601 instant."""
+  startsAt: String!
+}
+
+type Subscription {
+  appointmentUpdated(id: ID!): Appointment!
+}

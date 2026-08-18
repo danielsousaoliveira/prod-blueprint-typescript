@@ -15,7 +15,6 @@ npm-debug.log*
 playwright-report/
 test-results/
 .playwright/
-/apps/api/schema.gql
 
 # Playwright
 /test-results/
