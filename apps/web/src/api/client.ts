@@ -6,7 +6,7 @@
  * ============================================================================
  *
  * GraphQL for the CALENDAR read: it fetches availability, the doctor, and existing
- * appointments in one round trip, which is the case documented design choice identifies as GraphQL's
+ * appointments in one round trip, which is the documented design choice that makes GraphQL's
  * genuine win. REST for MUTATIONS: they need status codes (409 for a lost race) and the
  * `Idempotency-Key` header, both of which GraphQL flattens into a 200 with an errors array.
  *

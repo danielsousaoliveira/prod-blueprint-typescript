@@ -252,8 +252,8 @@ export function runAppointmentRepositoryContract(
       it('REJECTS accepting a counter-proposal whose slot was taken meanwhile', async () => {
         // The counter-proposal race. The proposed slot is not reserved while the patient
         // decides, so someone else can book it — and the guarantee must still hold at the
-        // moment of acceptance. This is the behaviour documented design choice documents as the known
-        // limit of a single-field unique index.
+        // moment of acceptance. This is the documented behaviour and the known limit of a
+        // single-field unique index.
         const requested = requestedAppointment({ id: 'a1' });
         await repo.create(requested);
 
