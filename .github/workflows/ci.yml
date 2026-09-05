@@ -106,14 +106,9 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      # ubuntu-latest already provides Chromium's system libraries. Avoid --with-deps,
-      # which invokes apt on every fresh runner and can stall on a slow mirror.
-      - run: npx playwright install chromium
+      # Only the browser the config actually uses. --with-deps installs the system
+      # libraries Chromium needs on the GitHub runner.
+      - run: npx playwright install chromium --with-deps
 
       # Real MongoDB (as a replica set — transactions need one) and Redis. `docker
       # compose --wait` blocks until both healthchecks pass, so Playwright never races a
@@ -125,6 +120,7 @@ jobs:
         env:
           MONGO_URL: mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
           MONGO_DB_NAME: scheduler_e2e
+          REDIS_URL: redis://localhost:6379
 
       # Playwright starts the API and the web dev server itself (see webServer in
       # playwright.config.ts) and waits for both to answer before running anything.
