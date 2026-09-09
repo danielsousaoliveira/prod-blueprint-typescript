@@ -106,8 +106,8 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # Only the browser the config actually uses. `--with-deps` installs the system
-      # libraries Chromium needs, which are absent from the runner image.
+      # Only the browser the config actually uses. --with-deps installs the system
+      # libraries Chromium needs on the GitHub runner.
       - run: npx playwright install chromium --with-deps
 
       # Real MongoDB (as a replica set — transactions need one) and Redis. `docker
@@ -120,6 +120,7 @@ jobs:
         env:
           MONGO_URL: mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
           MONGO_DB_NAME: scheduler_e2e
+          REDIS_URL: redis://localhost:6379
 
       # Playwright starts the API and the web dev server itself (see webServer in
       # playwright.config.ts) and waits for both to answer before running anything.

@@ -19,7 +19,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   MONGO_URL: z.string().url(),
-  MONGO_DB_NAME: z.string().min(1).default('scheduler'),
+  MONGO_DB_NAME: z.string().min(1).default('tenantforge'),
 
   REDIS_URL: z.string().url(),
 

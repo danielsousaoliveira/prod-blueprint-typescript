@@ -31,7 +31,7 @@ export interface ProblemDetails {
   errors?: { path: string; message: string }[];
 }
 
-const PROBLEM_BASE = 'https://scheduler.example/problems';
+const PROBLEM_BASE = 'https://tenantforge.example/problems';
 
 export const problems = {
   validation: `${PROBLEM_BASE}/validation-failed`,
@@ -57,7 +57,7 @@ export const problems = {
    * 403 — authenticated, is a party to the resource, but not permitted this action.
    *
    * Used ONLY when the caller already knows the resource exists. A caller who is not a
-   * party gets 404 from `notFound` instead — see DECISIONS §34, and the long comment in
+   * party gets 404 from `notFound` instead — see documented design choice, and the long comment in
    * the appointments controller.
    */
   forbidden: `${PROBLEM_BASE}/forbidden`,

@@ -58,7 +58,7 @@ export class MongoAppointmentRepository implements AppointmentRepository {
       if (outbox.length === 0) {
         // No outbox messages: a single-document insert is already atomic, and a
         // transaction here would add latency and an oplog write for nothing. This is
-        // the DECISIONS §13 position — transactions where they are warranted, not
+        // the documented design choice position — transactions where they are warranted, not
         // everywhere "for safety".
         await this.collection.insertOne(toDocument(appointment));
         return appointment;

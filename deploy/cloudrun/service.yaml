@@ -8,7 +8,7 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: scheduler-api
+  name: tenantforge-api
   annotations:
     run.googleapis.com/ingress: all
 spec:
@@ -28,7 +28,7 @@ spec:
         # --- Networking ----------------------------------------------------
         # All egress through the VPC connector, so MongoDB and Redis are reachable on
         # private IPs and never exposed publicly.
-        run.googleapis.com/vpc-access-connector: scheduler-connector
+        run.googleapis.com/vpc-access-connector: tenantforge-connector
         run.googleapis.com/vpc-access-egress: all-traffic
 
         # CPU is throttled outside a request by default. The outbox relay polls on a
@@ -44,10 +44,10 @@ spec:
       # instance finishes rather than being killed mid-drain.
       timeoutSeconds: 300
       containerConcurrency: 80
-      serviceAccountName: scheduler-api@PROJECT_ID.iam.gserviceaccount.com
+      serviceAccountName: tenantforge-api@PROJECT_ID.iam.gserviceaccount.com
 
       containers:
-        - image: europe-west1-docker.pkg.dev/PROJECT_ID/scheduler/api:TAG
+        - image: europe-west1-docker.pkg.dev/PROJECT_ID/tenantforge/api:TAG
           ports:
             # Cloud Run injects PORT; the container must listen on it.
             - name: http1
@@ -68,34 +68,34 @@ spec:
             - name: SHUTDOWN_TIMEOUT_MS
               value: '8000'
             - name: MONGO_DB_NAME
-              value: scheduler
+              value: tenantforge
 
             - name: MONGO_URL
               valueFrom:
                 secretKeyRef:
-                  name: scheduler-mongo-url
+                  name: tenantforge-mongo-url
                   key: latest
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
-                  name: scheduler-redis-url
+                  name: tenantforge-redis-url
                   key: latest
             - name: NOTIFICATION_PROVIDER_URL
               valueFrom:
                 secretKeyRef:
-                  name: scheduler-notification-url
+                  name: tenantforge-notification-url
                   key: latest
             # Sessions live in Redis and are opaque, so there is no signing secret to
-            # mount here — see DECISIONS §31. Secure is left at its default of true,
+            # mount here — see design rationale. Secure is left at its default of true,
             # because Cloud Run terminates TLS.
             - name: SESSION_TTL_SECONDS
               value: '604800'
             - name: ALLOWED_ORIGINS
-              value: 'https://scheduler.example'
+              value: 'https://tenantforge.example'
             - name: NOTIFICATION_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: scheduler-notification-key
+                  name: tenantforge-notification-key
                   key: latest
 
           # --- Probes -------------------------------------------------------
@@ -114,7 +114,7 @@ spec:
           # Liveness checks the PROCESS only — /health/live deliberately touches no
           # dependency. Pointing this at /health (which pings MongoDB) would restart
           # every instance simultaneously during a database blip, turning a recoverable
-          # incident into a restart storm. See DECISIONS §6.
+          # incident into a restart storm. See design rationale.
           livenessProbe:
             httpGet:
               path: /health/live
@@ -126,7 +126,7 @@ spec:
 # NOTE ON SUBSCRIPTIONS — resolving the question deferred since Phase 5.
 #
 # The GraphQL subscription is NOT used in production, and the frontend polls instead
-# (DECISIONS §27). Three reasons, all specific to this platform:
+# (design rationale). Three reasons, all specific to this platform:
 #
 #   1. Cloud Run bills for the whole duration of an open connection, so idle WebSockets
 #      cost the same as busy ones.

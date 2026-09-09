@@ -41,8 +41,8 @@ export interface Session {
  * This says it.
  *
  * Not a JWT: a session id is opaque and carries no claims, so there is nothing in it to
- * verify, nothing to leak if it is decoded, and nothing that goes stale. See DECISIONS
- * §31 for why that trade is deliberate.
+ * verify, nothing to leak if it is decoded, and nothing that goes stale. That trade keeps
+ * session identity server-side and opaque.
  * ============================================================================
  */
 export function generateSessionId(): string {

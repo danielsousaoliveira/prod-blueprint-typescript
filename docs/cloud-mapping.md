@@ -42,7 +42,7 @@ and MongoDB while both look healthy.
 **Cosmos DB's Mongo API is not MongoDB.** The most relevant difference for this project:
 **partial indexes** are unsupported. The double-booking guarantee is a partial unique
 index on `(doctorId, startsAt)` filtered to active statuses — without the filter, a
-cancelled slot could never be rebooked (DECISIONS §14). So "move to Azure" is not a
+cancelled slot could never be rebooked (documented design choice). So "move to Azure" is not a
 deployment change here; it is a redesign of the correctness mechanism. Atlas on Azure
 avoids that entirely, which is why it is the first choice in the table.
 
@@ -54,10 +54,10 @@ aggregation) or partial unique indexes needs checking against the specific versi
 
 ```bash
 # 1. Build and push
-gcloud builds submit --tag europe-west1-docker.pkg.dev/PROJECT_ID/scheduler/api:$GIT_SHA
+gcloud builds submit --tag europe-west1-docker.pkg.dev/PROJECT_ID/tenantforge/api:$GIT_SHA
 
 # 2. Migrate FIRST, as a separate step, as a job — not on boot
-gcloud run jobs execute scheduler-migrate --region=europe-west1 --wait
+gcloud run jobs execute tenantforge-migrate --region=europe-west1 --wait
 
 # 3. Then roll out the code
 gcloud run services replace deploy/cloudrun/service.yaml --region=europe-west1
@@ -78,7 +78,7 @@ The discipline is identical and platform-independent — only the noun changes.
 - **Cloud Armor** (AWS WAF / Azure Front Door) in front, with rate limiting. GraphQL makes
   this more than routine hardening: the client composes the query, so depth and complexity
   limits are application-level defences that a network-level one complements rather than
-  replaces (DECISIONS §19).
+  replaces (documented design choice).
 - **Uptime checks** against `/health`, alerting on the readiness endpoint rather than on
   raw error rate — it fails before users notice.
 - **Structured log correlation.** Pino already emits JSON, which Cloud Logging parses

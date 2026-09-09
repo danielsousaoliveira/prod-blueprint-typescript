@@ -1,6 +1,7 @@
-# Doctor Appointment Scheduling System
+# TenantForge
 
-A portfolio practice project. Patients browse a doctor's availability and request a slot;
+A multi-tenant SaaS starter focused on tenant isolation, subscription billing, subdomains,
+and role-based access. Its first domain slice lets patients browse a doctor's availability and request a slot;
 the doctor accepts, declines, or proposes a new time; the patient accepts or declines that
 counter-proposal. Both sides can cancel. Everyone gets notified.
 
@@ -15,13 +16,8 @@ Sessions are server-side and authorization is a domain rule: the appointment sta
 decides not just which transitions are legal but **who may make them**, checked over both
 the REST and GraphQL surfaces.
 
-The interesting content is in the three documents, not the code:
-
-| Document                                   | What it is                                                                      |
-| ------------------------------------------ | ------------------------------------------------------------------------------- |
-| [`DECISIONS.md`](DECISIONS.md)             | 36 decisions: alternatives, why, what would change my mind, what breaks at 100x |
-| [`INTERVIEW-NOTES.md`](INTERVIEW-NOTES.md) | The same material as spoken 60-second answers                                   |
-| [`AI-USAGE.md`](AI-USAGE.md)               | Where AI helped, and every place it was confidently wrong                       |
+TenantForge is intentionally narrow: its first workflow demonstrates how a multi-tenant
+product can protect identity, scheduling, and authorization boundaries.
 
 ## Running it
 
@@ -164,7 +160,7 @@ CONFIRMED:        doctor: cancel | complete
 `transition(appointment, event, actor)` is pure, so the whole rule set is enumerated rather
 than sampled: 6 statuses × 2 roles × 7 events = **84 combinations**, all asserted. Two
 distinct failures — not a party at all (**404**, so ids stay unenumerable) and a party
-whose role may not do this (**403**). See [DECISIONS §33 and §34](DECISIONS.md).
+whose role may not do this (**403**). The authorization rule is enforced by the domain state machine.
 
 ### Where the double-booking guarantee lives
 
@@ -179,8 +175,8 @@ One line, in `apps/api/src/persistence/migrations/index.ts`:
 A **partial** unique index on `(doctorId, startsAt)`. Unique, so two documents cannot claim
 one slot. Partial, so cancelled appointments become invisible to the constraint and release
 their time instead of burning it forever. Everything else — the service checks, the Redis
-lock, the optimistic-concurrency branch — is contention management. See
-[DECISIONS §14 and §16](DECISIONS.md).
+lock, the optimistic-concurrency branch — is contention management. The database index is
+the correctness boundary.
 
 ## Local infrastructure note
 
@@ -200,21 +196,15 @@ Migrations run as a **separate job before** the new revision rolls out, never at
 several instances booting at once would race, and every migration is backwards-compatible
 with the currently-running code because both versions serve traffic during a rollout.
 
-## Build phases
-
-Progress and the per-phase task lists live in [`tasks/`](tasks/). Start with
-[`tasks/PROGRESS.md`](tasks/PROGRESS.md).
-
 ## Known limitations
 
-Named here rather than left to be discovered — the full list is at the end of
-[`DECISIONS.md`](DECISIONS.md).
+Named here rather than left to be discovered.
 
 - **No self-service registration, password reset, email verification or MFA.** Accounts are
   seeded. Password reset in particular is where many auth systems are actually broken, and
   building it badly would be worse than not building it.
 - **A counter-proposed slot is not reserved** while the patient decides. Documented, tested,
-  and a genuine limit of a single-field unique index (DECISIONS §14).
+  and a genuine limit of a single-field unique index.
 - **Per-IP login rate limiting will misbehave behind a load balancer** — `request.ip` becomes
   the balancer's. Flagged in `auth.controller.ts` rather than guessed at.
 - **No Content-Security-Policy.** The httpOnly cookie limits what an XSS can steal; a CSP is

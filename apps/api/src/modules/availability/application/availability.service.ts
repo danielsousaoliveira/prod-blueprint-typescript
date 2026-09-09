@@ -45,7 +45,7 @@ export class AvailabilityService {
    */
   async forDoctor(doctorId: string, range: Interval): Promise<DoctorAvailability | null> {
     // Cache the COMPUTED RESULT of a pure function. That is a much smaller commitment
-    // than materialising slots as a second representation of the data (DECISIONS §12) —
+    // than materialising slots as a second representation of the data (documented design choice) —
     // if the cache is wrong or unhelpful, deleting it costs nothing and correctness is
     // unaffected, because deriving remains the source of truth.
     const cached = await this.cache.get(doctorId, range.start, range.end);

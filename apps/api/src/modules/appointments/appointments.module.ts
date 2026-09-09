@@ -22,7 +22,7 @@ import { MongoAppointmentRepository } from './persistence/mongo-appointment.repo
  * Consumers inject tokens (`APPOINTMENT_REPOSITORY`, `DISTRIBUTED_LOCK`,
  * `IDEMPOTENCY_STORE`) and receive interfaces — no service names a concrete class. That
  * is what makes the in-memory adapters usable in tests without touching the code under
- * test, and it is the concrete payoff of DECISIONS §1.
+ * test, and it is the concrete payoff of documented design choice.
  */
 @Module({
   imports: [AvailabilityModule],

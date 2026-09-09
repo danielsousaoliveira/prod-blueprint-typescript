@@ -17,7 +17,7 @@ import type {
  * `availability_rules` holds one document per DOCTOR with the rules embedded, and
  * `availability_exceptions` holds one document per exception.
  *
- * That asymmetry is the embed-vs-reference decision made concrete (DECISIONS §11): rules
+ * That asymmetry is the embed-vs-reference decision made concrete (documented design choice): rules
  * are bounded and always read with the doctor, exceptions grow without limit.
  */
 interface ScheduleDocument {

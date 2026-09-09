@@ -125,7 +125,7 @@ export function toDocument(appointment: Appointment): AppointmentDocument {
  * Note this is intentionally NOT `heldSlots()` from the domain, which returns BOTH slots
  * for a counter-proposal. A document has one indexed slot; the availability engine hides
  * the proposed slot from other patients as a courtesy, but the database constraint
- * applies to the held one. See DECISIONS.md — this is the known limit of a single-field
+ * applies to the held one. See documented design choice — this is the known limit of a single-field
  * unique index, and the reason a `slot_holds` collection is the alternative.
  */
 function heldSlotForStorage(appointment: Appointment): { start: number; end: number } {
