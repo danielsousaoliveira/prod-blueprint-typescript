@@ -54,10 +54,10 @@ aggregation) or partial unique indexes needs checking against the specific versi
 
 ```bash
 # 1. Build and push
-gcloud builds submit --tag europe-west1-docker.pkg.dev/PROJECT_ID/scheduler/api:$GIT_SHA
+gcloud builds submit --tag europe-west1-docker.pkg.dev/PROJECT_ID/tenantforge/api:$GIT_SHA
 
 # 2. Migrate FIRST, as a separate step, as a job — not on boot
-gcloud run jobs execute scheduler-migrate --region=europe-west1 --wait
+gcloud run jobs execute tenantforge-migrate --region=europe-west1 --wait
 
 # 3. Then roll out the code
 gcloud run services replace deploy/cloudrun/service.yaml --region=europe-west1
