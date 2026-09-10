@@ -80,6 +80,22 @@ spec:
                 secretKeyRef:
                   name: tenantforge-redis-url
                   key: latest
+            # Postgres runs beside MongoDB and no feature reads it yet, but the readiness
+            # check pings it — so the runtime connection string must be present or every
+            # instance reports 503. Runtime role only: it owns nothing and cannot bypass
+            # row-level security. The migration (owner) and cross-tenant strings are
+            # injected into the migration job and the relay respectively, not here.
+            # The three roles are created once per database by a superuser bootstrap
+            # BEFORE the first migration — see deploy/postgres/README.md.
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tenantforge-postgres-url
+                  key: latest
+            # Per-instance pool ceiling. POSTGRES_POOL_MAX x maxScale (10) must stay under
+            # the database's connection limit — see README, "connection pool sizing".
+            - name: POSTGRES_POOL_MAX
+              value: '10'
             - name: NOTIFICATION_PROVIDER_URL
               valueFrom:
                 secretKeyRef:

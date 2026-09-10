@@ -23,6 +23,38 @@ const envSchema = z.object({
 
   REDIS_URL: z.string().url(),
 
+  /**
+   * Postgres connection strings — one per database role (see
+   * deploy/postgres/init/01-roles.sql). Present but unused by any feature this phase; a
+   * bad value still fails the boot rather than surfacing on the first query.
+   *
+   *   POSTGRES_URL              runtime role: owns nothing, cannot bypass row-level
+   *                             security. The pool the request path holds. REQUIRED —
+   *                             the readiness check pings it.
+   *   POSTGRES_MIGRATION_URL    owner role. Used ONLY by `db:migrate:pg`, which parses
+   *                             its own env; deliberately kept out of the serving
+   *                             process, so it is optional here and its secret is
+   *                             injected into the migration job, not the service.
+   *   POSTGRES_CROSS_TENANT_URL privileged role for the two operations that legitimately
+   *                             cross tenants (outbox relay, billing webhook resolver).
+   *                             No code reads it yet — optional until the relay lands.
+   *
+   * The two optional entries are still validated: an INVALID value fails the boot, only
+   * an absent one is tolerated.
+   */
+  POSTGRES_URL: z.string().url(),
+  POSTGRES_MIGRATION_URL: z.string().url().optional(),
+  POSTGRES_CROSS_TENANT_URL: z.string().url().optional(),
+
+  /**
+   * Per-instance Postgres pool ceiling. Small on purpose: the isolation model added
+   * later holds a connection for the whole request (to keep `SET LOCAL` tenant context
+   * pinned to it), so this number bounds real request concurrency, and this number times
+   * the instance ceiling must stay under the managed database's connection limit. See
+   * the sizing note in README.md.
+   */
+  POSTGRES_POOL_MAX: z.coerce.number().int().positive().max(50).default(10),
+
   /** External notification provider. Mocked at the network boundary in tests (Phase 8). */
   NOTIFICATION_PROVIDER_URL: z.string().url().default('https://notifications.example'),
   NOTIFICATION_API_KEY: z.string().default('dev-key'),

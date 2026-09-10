@@ -7,6 +7,7 @@ import request from 'supertest';
 import { DateTime } from 'luxon';
 import { RedisService } from '../../infra/redis.service';
 import { MongoService } from '../../infra/mongo.service';
+import { PostgresService } from '../../infra/postgres.service';
 import { ProblemDetailsFilter } from '../../shared/http/problem-details';
 import {
   IDEMPOTENCY_STORE,
@@ -150,6 +151,10 @@ beforeAll(async () => {
       { provide: MongoService, useValue: harness.mongoService },
       {
         provide: RedisService,
+        useValue: { ping: () => Promise.resolve() },
+      },
+      {
+        provide: PostgresService,
         useValue: { ping: () => Promise.resolve() },
       },
       {
