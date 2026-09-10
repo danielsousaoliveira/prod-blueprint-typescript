@@ -195,6 +195,46 @@ depend on them. Connecting from outside Docker needs `directConnection=true` in 
 otherwise the driver reads the replica set config, sees the member advertised under its
 in-container hostname, and tries to reconnect through that instead of the published port.
 
+### Postgres roles and connection strings
+
+Three login roles, defined once in `deploy/postgres/init/01-roles.sql` and applied the
+same way everywhere — auto-run in the local container and the test harness, a one-time
+superuser bootstrap on a managed instance before the first migration.
+[`deploy/postgres/README.md`](deploy/postgres/README.md) has the per-environment detail.
+
+| Role                      | Owns    | Bypasses RLS | Used by                                  |
+| ------------------------- | ------- | ------------ | ---------------------------------------- |
+| `tenantforge_owner`       | schema  | yes          | `db:migrate:pg` only                     |
+| `tenantforge_app`         | nothing | no           | the running application (`POSTGRES_URL`) |
+| `tenantforge_crosstenant` | nothing | yes          | outbox relay + billing webhook resolver  |
+
+The split is load-bearing for the isolation added next phase: a table's owner bypasses a
+row-level-security policy unless it is `FORCE`d, and any `BYPASSRLS` role ignores policies
+entirely. If the runtime role owned its tables or could bypass, isolation would pass every
+test and enforce nothing. `apps/api/src/infra/postgres-roles.integration.spec.ts` asserts
+the runtime role owns no tables and cannot bypass.
+
+Grants cover existing tables **and** default privileges cover future ones — without the
+latter, the first table a later migration adds would be invisible to the runtime role and
+the break would surface in that deployment, not this one.
+
+### Postgres connection pool sizing
+
+`POSTGRES_POOL_MAX` is the per-instance ceiling (default 10). It matters more than the
+MongoDB pool because the isolation model holds one connection for the whole request —
+tenant context is set with `SET LOCAL` and must stay pinned to that connection — so
+`POSTGRES_POOL_MAX` effectively bounds per-instance request concurrency.
+
+The number that must not be exceeded is the managed database's connection limit:
+
+```
+POSTGRES_POOL_MAX  ×  autoscaling maxScale  +  headroom for migrations/admin  ≤  server max_connections
+```
+
+With `maxScale: 10` (see `deploy/cloudrun/service.yaml`) and a pool of 10, that is ~100
+connections plus headroom. Raising either multiplier without checking the server limit is
+how a serverless autoscaler takes down the database it depends on.
+
 ## Deployment
 
 Multi-stage Dockerfile, non-root, dev dependencies pruned; `deploy/cloudrun/service.yaml`
