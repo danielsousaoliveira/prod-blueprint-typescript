@@ -46,8 +46,13 @@ Two commands rather than one, deliberately: making it one means adding `concurre
 dependency purely to avoid opening a terminal, and interleaved output from two servers is
 harder to read than two windows.
 
-`infra:up` uses `--wait`, so it returns only once MongoDB and Redis report healthy — the
-API never races a replica set that is still electing a primary.
+`infra:up` uses `--wait`, so it returns only once MongoDB, Postgres and Redis report
+healthy — the API never races a replica set that is still electing a primary, nor a
+Postgres that is still starting.
+
+Postgres runs beside MongoDB from this phase on. No feature reads it yet; it is stood up
+first so the later move to relational storage is a sequence of reviewable changes rather
+than one unreviewable swap. It has its own migration step, `npm run db:migrate:pg`.
 
 Verify:
 
