@@ -12,6 +12,8 @@
     "test:cov": "jest --coverage",
     "test:integration": "jest --config jest.integration.config.js",
     "db:migrate": "ts-node -P tsconfig.json src/persistence/scripts/migrate.ts",
+    "db:generate:pg": "drizzle-kit generate",
+    "db:migrate:pg": "ts-node -P tsconfig.json src/persistence/scripts/migrate-pg.ts",
     "db:explain": "ts-node -P tsconfig.json src/persistence/scripts/db-explain.ts"
   },
   "dependencies": {

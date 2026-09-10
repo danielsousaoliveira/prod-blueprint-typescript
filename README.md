@@ -29,7 +29,7 @@ That is API plus infrastructure. Then apply migrations and start the frontend in
 terminal:
 
 ```bash
-npm run db:migrate && npm run dev:web
+npm run db:migrate && npm run db:migrate:pg && npm run dev:web
 ```
 
 Migration 005 seeds two demo accounts — **outside production only**:
@@ -102,15 +102,17 @@ same-zone case.
 
 Other useful commands:
 
-| Command                           | What it does                                      |
-| --------------------------------- | ------------------------------------------------- |
-| `npm run build`                   | Compile all workspaces                            |
-| `npm run lint`                    | ESLint across the monorepo (incl. layering rules) |
-| `npm run typecheck`               | `tsc --noEmit` per workspace, tests included      |
-| `npm run db:migrate`              | Ordered migrations — a deploy step, never on boot |
-| `npm run db:explain`              | `explain()` output for every indexed query        |
-| `npm run test:e2e:ui`             | Playwright in watch/inspect mode                  |
-| `npm run infra:up` / `infra:down` | MongoDB + Redis                                   |
+| Command                           | What it does                                                |
+| --------------------------------- | ----------------------------------------------------------- |
+| `npm run build`                   | Compile all workspaces                                      |
+| `npm run lint`                    | ESLint across the monorepo (incl. layering rules)           |
+| `npm run typecheck`               | `tsc --noEmit` per workspace, tests included                |
+| `npm run db:migrate`              | Ordered MongoDB migrations — a deploy step, never on boot   |
+| `npm run db:generate:pg`          | Generate SQL migrations from `src/persistence/pg/schema.ts` |
+| `npm run db:migrate:pg`           | Apply Postgres migrations — a deploy step, never on boot    |
+| `npm run db:explain`              | `explain()` output for every indexed query                  |
+| `npm run test:e2e:ui`             | Playwright in watch/inspect mode                            |
+| `npm run infra:up` / `infra:down` | MongoDB + Postgres + Redis                                  |
 
 ## Architecture
 
@@ -119,12 +121,13 @@ apps/
   api/                        NestJS — REST and GraphQL over ONE service layer
     src/
       config/                 Zod-validated environment, parsed once at boot
-      infra/                  MongoClient and Redis connection lifecycles
+      infra/                  MongoClient, Postgres pool and Redis connection lifecycles
       shared/
         intervals/            timezone-free interval algebra on epoch millis
         time/                 the ONLY place a timezone is applied
         http/                 RFC 7807 problem+json
-      persistence/            ordered migrations, explain scripts
+      persistence/            ordered MongoDB migrations, explain scripts
+        pg/                   typed schema + generated/hand-written Postgres migrations
       modules/                feature folders, not layer folders
         appointments/           domain state machine, service, REST controller
         availability/           derivation engine + Redis cache

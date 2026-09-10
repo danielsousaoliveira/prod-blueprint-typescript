@@ -3,6 +3,16 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "persistence/pg/migrations/**/*.sql",
+        "watchAssets": false
+      },
+      {
+        "include": "persistence/pg/migrations/**/*.json",
+        "watchAssets": false
+      }
+    ]
   }
 }
