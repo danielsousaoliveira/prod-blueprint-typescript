@@ -60,11 +60,12 @@ Verify:
 curl -s localhost:3000/health | jq
 ```
 
-`/health` is a readiness check — it pings MongoDB and Redis and returns **503** if either
-is down, so an orchestrator stops routing traffic to a broken instance. `/health/live` is
-liveness and deliberately checks nothing external. Both are `VERSION_NEUTRAL`: URI
-versioning would otherwise move them to `/v1/health`, which is a probe path silently
-breaking on a routing change (it did, for two phases).
+`/health` is a readiness check — it pings MongoDB, Postgres and Redis and returns **503**
+if any is down, so an orchestrator stops routing traffic to a broken instance. Each ping
+is a bare reachability check (`ping`, `SELECT 1`) that needs no tenant context.
+`/health/live` is liveness and deliberately checks nothing external. Both are
+`VERSION_NEUTRAL`: URI versioning would otherwise move them to `/v1/health`, which is a
+probe path silently breaking on a routing change (it did, for two phases).
 
 Tear down (`-v` also drops the data volumes):
 

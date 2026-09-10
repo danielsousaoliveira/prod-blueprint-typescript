@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MongoService } from '../../infra/mongo.service';
+import { PostgresService } from '../../infra/postgres.service';
 import { RedisService } from '../../infra/redis.service';
 
 export type DependencyStatus =
@@ -10,6 +11,7 @@ export interface HealthReport {
   uptimeSeconds: number;
   dependencies: {
     mongo: DependencyStatus;
+    postgres: DependencyStatus;
     redis: DependencyStatus;
   };
 }
@@ -20,6 +22,7 @@ export class HealthService {
 
   constructor(
     private readonly mongo: MongoService,
+    private readonly postgres: PostgresService,
     private readonly redis: RedisService,
   ) {}
 
@@ -35,17 +38,19 @@ export class HealthService {
    * endpoint's worst case the SUM of both timeouts rather than the max.
    */
   async check(): Promise<HealthReport> {
-    const [mongo, redis] = await Promise.all([
+    const [mongo, postgres, redis] = await Promise.all([
       this.probe('mongo', () => this.mongo.ping()),
+      this.probe('postgres', () => this.postgres.ping()),
       this.probe('redis', () => this.redis.ping()),
     ]);
 
-    const healthy = mongo.status === 'up' && redis.status === 'up';
+    const healthy =
+      mongo.status === 'up' && postgres.status === 'up' && redis.status === 'up';
 
     return {
       status: healthy ? 'healthy' : 'unhealthy',
       uptimeSeconds: Math.round(process.uptime()),
-      dependencies: { mongo, redis },
+      dependencies: { mongo, postgres, redis },
     };
   }
 
