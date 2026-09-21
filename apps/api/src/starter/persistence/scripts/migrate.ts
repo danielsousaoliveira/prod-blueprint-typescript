@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { MongoClient } from 'mongodb';
 import { loadEnv } from '../../config/env';
-import { runMigrations } from '../../../demonstration/persistence/migrations';
+import { demonstrationRegistry } from '../../demonstration-registry';
 
 /**
  * `npm run db:migrate`
@@ -19,8 +19,9 @@ async function main(): Promise<void> {
   await client.connect();
 
   try {
-    const applied = await runMigrations(client.db(env.MONGO_DB_NAME), (message) =>
-      console.log(message),
+    const applied = await demonstrationRegistry.runMigrations(
+      client.db(env.MONGO_DB_NAME),
+      (message) => console.log(message),
     );
 
     console.log(

@@ -2,20 +2,14 @@ import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
 import { Inject, Module } from '@nestjs/common';
 import { GraphQLModule as NestGraphQLModule } from '@nestjs/graphql';
 import { ENV, type Env } from '../../config/env';
-import { AppointmentsModule } from '../../../demonstration/modules/appointments/appointments.module';
-import { AvailabilityModule } from '../../../demonstration/modules/availability/availability.module';
-import { DoctorsModule } from '../../../demonstration/modules/doctors/doctors.module';
 import {
   DOCTOR_REPOSITORY,
   PATIENT_REPOSITORY,
+  demonstrationRegistry,
   type DoctorRepository,
   type PatientRepository,
-} from '../../../demonstration/modules/doctors/domain/doctor.repository';
+} from '../../demonstration-registry';
 import { AuthService } from '../auth/application/auth.service';
-import {
-  AppointmentsResolver,
-  DoctorResolver,
-} from '../../../demonstration/graphql/appointments.resolver';
 import { ComplexityPlugin } from './complexity.plugin';
 import { createLoaders, type GraphQLContext } from './dataloaders';
 import { MAX_DEPTH, depthLimit } from './query-guards';
@@ -52,12 +46,10 @@ function readCookie(header: string | undefined, name: string): string | undefine
 
 @Module({
   imports: [
-    AppointmentsModule,
-    AvailabilityModule,
-    DoctorsModule,
+    ...demonstrationRegistry.graphqlModules,
     NestGraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      imports: [DoctorsModule],
+      imports: [...demonstrationRegistry.graphqlModules],
       inject: [ENV, DOCTOR_REPOSITORY, PATIENT_REPOSITORY, AuthService],
       useFactory: (
         env: Env,
@@ -182,7 +174,7 @@ function readCookie(header: string | undefined, name: string): string | undefine
       }),
     }),
   ],
-  providers: [AppointmentsResolver, DoctorResolver, ComplexityPlugin],
+  providers: [...demonstrationRegistry.graphqlResolvers, ComplexityPlugin],
 })
 export class GraphQLApiModule {
   constructor(@Inject(ENV) _env: Env) {}

@@ -4,7 +4,7 @@ import type {
   DoctorRepository,
   Patient,
   PatientRepository,
-} from '../../../demonstration/modules/doctors/domain/doctor.repository';
+} from '../../demonstration-registry';
 
 /**
  * Per-request DataLoaders.

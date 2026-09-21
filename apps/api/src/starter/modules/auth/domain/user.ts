@@ -1,30 +1,18 @@
-import type { Party } from '../../../../demonstration/modules/appointments/domain/appointment';
-
 /**
  * Who someone is, and what they are allowed to be.
  *
- * ============================================================================
- * WHY `role` REUSES `Party` RATHER THAN DEFINING ITS OWN UNION
- * ============================================================================
- *
- * `Party = 'doctor' | 'patient'` already exists in the appointment domain, where it
- * answers "who acted" for the audit trail. Authorization asks a different question —
- * "who is allowed to act" — and the temptation is to define a separate `Role` type
- * because they are conceptually distinct.
- *
- * They are deliberately the same type here, because in this domain they are the same
- * set and keeping them identical is what makes the actor-aware transition table
- * typecheck without a conversion function sitting between two unions that always agree.
- * A conversion function between two identical unions is a place for them to silently
- * diverge.
+ * `'doctor' | 'patient'` also happens to be the demonstration's `Party` union — the
+ * appointment domain's answer to "who acted" for the audit trail. Authorization asks a
+ * different question, "who is allowed to act", and the two unions are kept structurally
+ * identical rather than merged into one shared type, precisely so the starter's own
+ * `Role` never has to import from the demonstration it is meant to work without.
  *
  * The moment a third role appears that cannot be a party to an appointment — an
- * administrator, a receptionist booking on a patient's behalf — this stops being true
- * and `Role` becomes its own union with an explicit mapping. That is the trigger, and
- * it is recorded in documented design choice.
- * ============================================================================
+ * administrator, a receptionist booking on a patient's behalf — this stops being a
+ * coincidence and both unions grow independently. That is recorded in documented design
+ * choice.
  */
-export type Role = Party;
+export type Role = 'doctor' | 'patient';
 
 /**
  * A user account.

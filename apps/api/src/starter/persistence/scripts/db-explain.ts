@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { MongoClient } from 'mongodb';
 import { loadEnv } from '../../config/env';
-import { MongoAppointmentRepository } from '../../../demonstration/modules/appointments/persistence/mongo-appointment.repository';
+import { demonstrationRegistry } from '../../demonstration-registry';
 
 /**
  * `npm run db:explain`
@@ -52,12 +52,12 @@ async function main(): Promise<void> {
 
   try {
     const db = client.db(env.MONGO_DB_NAME);
-    const queries = MongoAppointmentRepository.explainQueries(db);
+    const queries = demonstrationRegistry.explainQueries(db);
 
     let anyCollScan = false;
 
     for (const query of queries) {
-      const explain = (await query.run()) as unknown as ExplainOutput;
+      const explain = (await query.run()) as ExplainOutput;
       const stage = leafStage(explain.queryPlanner.winningPlan);
       const stats = explain.executionStats;
       const ratio =

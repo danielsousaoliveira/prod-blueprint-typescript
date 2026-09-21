@@ -7,13 +7,12 @@ import {
 } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
 import { ENV, type Env } from '../../config/env';
-import { AvailabilityModule } from '../../../demonstration/modules/availability/availability.module';
 import {
   NOTIFICATION_PROVIDER,
+  ReminderScheduler,
+  demonstrationRegistry,
   type NotificationProvider,
-  HttpNotificationProvider,
-} from '../../../demonstration/modules/notifications/domain/notification.provider';
-import { ReminderScheduler } from '../../../demonstration/modules/notifications/application/reminder.scheduler';
+} from '../../demonstration-registry';
 import { OutboxRelay } from '../outbox/application/outbox-relay.service';
 import { OUTBOX_REPOSITORY } from '../outbox/domain/outbox';
 import { MongoOutboxRepository } from '../outbox/persistence/mongo-outbox.repository';
@@ -110,7 +109,6 @@ class JobsRuntime implements OnApplicationShutdown {
 }
 
 @Module({
-  imports: [AvailabilityModule],
   providers: [
     { provide: OUTBOX_REPOSITORY, useClass: MongoOutboxRepository },
 
@@ -135,7 +133,7 @@ class JobsRuntime implements OnApplicationShutdown {
       provide: NOTIFICATION_PROVIDER,
       inject: [ENV],
       useFactory: (env: Env): NotificationProvider =>
-        new HttpNotificationProvider(
+        demonstrationRegistry.createNotificationProvider(
           env.NOTIFICATION_PROVIDER_URL,
           env.NOTIFICATION_API_KEY,
         ),
@@ -144,7 +142,7 @@ class JobsRuntime implements OnApplicationShutdown {
     {
       provide: ReminderScheduler,
       inject: [REMINDER_QUEUE],
-      useFactory: (queue: Queue) => new ReminderScheduler(queue),
+      useFactory: (queue: Queue) => demonstrationRegistry.createReminderScheduler(queue),
     },
     {
       provide: OutboxRelay,

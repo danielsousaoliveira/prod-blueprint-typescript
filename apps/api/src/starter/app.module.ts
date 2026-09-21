@@ -3,10 +3,8 @@ import { LoggerModule } from 'nestjs-pino';
 import { ConfigModule } from './config/config.module';
 import { ENV, type Env } from './config/env';
 import { InfraModule } from './infra/infra.module';
-import { AppointmentsModule } from '../demonstration/modules/appointments/appointments.module';
+import { demonstrationRegistry } from './demonstration-registry';
 import { AuthModule } from './modules/auth/auth.module';
-import { AvailabilityModule } from '../demonstration/modules/availability/availability.module';
-import { DoctorsModule } from '../demonstration/modules/doctors/doctors.module';
 import { GraphQLApiModule } from './modules/graphql/graphql.module';
 import { HealthModule } from './modules/health/health.module';
 import { JobsModule } from './modules/jobs/jobs.module';
@@ -45,9 +43,7 @@ import { testSupportModules } from './test-support/test-support.controller';
     // Before the feature modules: it registers the global APP_GUARD, so everything
     // imported after it is protected by default.
     AuthModule,
-    DoctorsModule,
-    AvailabilityModule,
-    AppointmentsModule,
+    ...demonstrationRegistry.appModules,
     JobsModule,
     GraphQLApiModule,
     // Empty in every real deployment — see test-support.controller.ts.
