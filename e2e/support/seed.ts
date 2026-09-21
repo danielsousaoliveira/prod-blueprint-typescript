@@ -1,6 +1,6 @@
 import { MongoClient } from 'mongodb';
 import { DateTime } from 'luxon';
-import { hashPassword } from '../../apps/api/src/modules/auth/domain/password';
+import { hashPassword } from '../../apps/api/src/starter/modules/auth/domain/password';
 
 /**
  * Seeds a doctor with a schedule, directly in MongoDB.

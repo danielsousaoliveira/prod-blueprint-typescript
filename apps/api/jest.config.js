@@ -32,12 +32,12 @@ module.exports = {
   // down to a number that permits untested domain logic, or invite mock-heavy tests that
   // assert the mocks rather than the behaviour.
   collectCoverageFrom: [
-    'shared/intervals/**/*.ts',
-    'shared/time/**/*.ts',
-    'modules/appointments/domain/appointment.ts',
-    'modules/appointments/domain/state-machine.ts',
-    'modules/auth/domain/*.ts',
-    'modules/availability/domain/availability.engine.ts',
+    'starter/shared/intervals/**/*.ts',
+    'starter/shared/time/**/*.ts',
+    'demonstration/modules/appointments/domain/appointment.ts',
+    'demonstration/modules/appointments/domain/state-machine.ts',
+    'starter/modules/auth/domain/*.ts',
+    'demonstration/modules/availability/domain/availability.engine.ts',
     '!**/*.spec.ts',
   ],
   // A ratchet, not a target: it exists to make a regression fail the build.

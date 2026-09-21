@@ -51,7 +51,10 @@ export default tseslint.config(
   // for convenience, and the layering is gone. This makes it a build failure.
   // ---------------------------------------------------------------------------
   {
-    files: ['**/src/modules/**/domain/**/*.ts', '**/src/modules/**/application/**/*.ts'],
+    files: [
+      '**/src/*/modules/**/domain/**/*.ts',
+      '**/src/*/modules/**/application/**/*.ts',
+    ],
     ignores: ['**/*.spec.ts', '**/*.contract.ts'],
     rules: {
       'no-restricted-imports': [

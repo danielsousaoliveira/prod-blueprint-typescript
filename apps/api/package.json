@@ -5,16 +5,16 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
-    "start": "node dist/main.js",
+    "start": "node dist/starter/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:integration": "jest --config jest.integration.config.js",
-    "db:migrate": "ts-node -P tsconfig.json src/persistence/scripts/migrate.ts",
+    "db:migrate": "ts-node -P tsconfig.json src/starter/persistence/scripts/migrate.ts",
     "db:generate:pg": "drizzle-kit generate",
-    "db:migrate:pg": "ts-node -P tsconfig.json src/persistence/scripts/migrate-pg.ts",
-    "db:explain": "ts-node -P tsconfig.json src/persistence/scripts/db-explain.ts"
+    "db:migrate:pg": "ts-node -P tsconfig.json src/starter/persistence/scripts/migrate-pg.ts",
+    "db:explain": "ts-node -P tsconfig.json src/starter/persistence/scripts/db-explain.ts"
   },
   "dependencies": {
     "@apollo/server": "^4.13.0",
