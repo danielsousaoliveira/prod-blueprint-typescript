@@ -30,6 +30,34 @@ services:
       retries: 20
       start_period: 5s
 
+  # Postgres runs BESIDE MongoDB during the migration to relational storage. Nothing
+  # reads from it yet — standing it up first means each later step is a reviewable change
+  # rather than a database swap and a tenancy model landing at once.
+  postgres:
+    image: postgres:16
+    # postgres:16 ships the `btree_gist` contrib extension, which the no-double-booking
+    # exclusion constraint on time ranges needs in a later phase. postgis is not
+    # required, so the plain image is enough.
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tenantforge
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs once, on an empty data directory: provisions the three roles the isolation
+      # model depends on. The same SQL the test harness and the deployment apply.
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # `pg_isready` against the real database, so `docker compose up --wait` blocks
+      # until Postgres actually accepts connections rather than racing it.
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d tenantforge']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
   redis:
     image: redis:7-alpine
     ports:
@@ -45,3 +73,4 @@ services:
 volumes:
   mongo-data:
   redis-data:
+  postgres-data:

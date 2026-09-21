@@ -29,7 +29,7 @@ That is API plus infrastructure. Then apply migrations and start the frontend in
 terminal:
 
 ```bash
-npm run db:migrate && npm run dev:web
+npm run db:migrate && npm run db:migrate:pg && npm run dev:web
 ```
 
 Migration 005 seeds two demo accounts — **outside production only**:
@@ -46,8 +46,13 @@ Two commands rather than one, deliberately: making it one means adding `concurre
 dependency purely to avoid opening a terminal, and interleaved output from two servers is
 harder to read than two windows.
 
-`infra:up` uses `--wait`, so it returns only once MongoDB and Redis report healthy — the
-API never races a replica set that is still electing a primary.
+`infra:up` uses `--wait`, so it returns only once MongoDB, Postgres and Redis report
+healthy — the API never races a replica set that is still electing a primary, nor a
+Postgres that is still starting.
+
+Postgres runs beside MongoDB from this phase on. No feature reads it yet; it is stood up
+first so the later move to relational storage is a sequence of reviewable changes rather
+than one unreviewable swap. It has its own migration step, `npm run db:migrate:pg`.
 
 Verify:
 
@@ -55,11 +60,12 @@ Verify:
 curl -s localhost:3000/health | jq
 ```
 
-`/health` is a readiness check — it pings MongoDB and Redis and returns **503** if either
-is down, so an orchestrator stops routing traffic to a broken instance. `/health/live` is
-liveness and deliberately checks nothing external. Both are `VERSION_NEUTRAL`: URI
-versioning would otherwise move them to `/v1/health`, which is a probe path silently
-breaking on a routing change (it did, for two phases).
+`/health` is a readiness check — it pings MongoDB, Postgres and Redis and returns **503**
+if any is down, so an orchestrator stops routing traffic to a broken instance. Each ping
+is a bare reachability check (`ping`, `SELECT 1`) that needs no tenant context.
+`/health/live` is liveness and deliberately checks nothing external. Both are
+`VERSION_NEUTRAL`: URI versioning would otherwise move them to `/v1/health`, which is a
+probe path silently breaking on a routing change (it did, for two phases).
 
 Tear down (`-v` also drops the data volumes):
 
@@ -96,15 +102,17 @@ same-zone case.
 
 Other useful commands:
 
-| Command                           | What it does                                      |
-| --------------------------------- | ------------------------------------------------- |
-| `npm run build`                   | Compile all workspaces                            |
-| `npm run lint`                    | ESLint across the monorepo (incl. layering rules) |
-| `npm run typecheck`               | `tsc --noEmit` per workspace, tests included      |
-| `npm run db:migrate`              | Ordered migrations — a deploy step, never on boot |
-| `npm run db:explain`              | `explain()` output for every indexed query        |
-| `npm run test:e2e:ui`             | Playwright in watch/inspect mode                  |
-| `npm run infra:up` / `infra:down` | MongoDB + Redis                                   |
+| Command                           | What it does                                                |
+| --------------------------------- | ----------------------------------------------------------- |
+| `npm run build`                   | Compile all workspaces                                      |
+| `npm run lint`                    | ESLint across the monorepo (incl. layering rules)           |
+| `npm run typecheck`               | `tsc --noEmit` per workspace, tests included                |
+| `npm run db:migrate`              | Ordered MongoDB migrations — a deploy step, never on boot   |
+| `npm run db:generate:pg`          | Generate SQL migrations from `src/persistence/pg/schema.ts` |
+| `npm run db:migrate:pg`           | Apply Postgres migrations — a deploy step, never on boot    |
+| `npm run db:explain`              | `explain()` output for every indexed query                  |
+| `npm run test:e2e:ui`             | Playwright in watch/inspect mode                            |
+| `npm run infra:up` / `infra:down` | MongoDB + Postgres + Redis                                  |
 
 ## Architecture
 
@@ -113,12 +121,13 @@ apps/
   api/                        NestJS — REST and GraphQL over ONE service layer
     src/
       config/                 Zod-validated environment, parsed once at boot
-      infra/                  MongoClient and Redis connection lifecycles
+      infra/                  MongoClient, Postgres pool and Redis connection lifecycles
       shared/
         intervals/            timezone-free interval algebra on epoch millis
         time/                 the ONLY place a timezone is applied
         http/                 RFC 7807 problem+json
-      persistence/            ordered migrations, explain scripts
+      persistence/            ordered MongoDB migrations, explain scripts
+        pg/                   typed schema + generated/hand-written Postgres migrations
       modules/                feature folders, not layer folders
         appointments/           domain state machine, service, REST controller
         availability/           derivation engine + Redis cache
@@ -185,6 +194,46 @@ transactions require one, and both the booking write path and the transactional 
 depend on them. Connecting from outside Docker needs `directConnection=true` in the URL —
 otherwise the driver reads the replica set config, sees the member advertised under its
 in-container hostname, and tries to reconnect through that instead of the published port.
+
+### Postgres roles and connection strings
+
+Three login roles, defined once in `deploy/postgres/init/01-roles.sql` and applied the
+same way everywhere — auto-run in the local container and the test harness, a one-time
+superuser bootstrap on a managed instance before the first migration.
+[`deploy/postgres/README.md`](deploy/postgres/README.md) has the per-environment detail.
+
+| Role                      | Owns    | Bypasses RLS | Used by                                  |
+| ------------------------- | ------- | ------------ | ---------------------------------------- |
+| `tenantforge_owner`       | schema  | yes          | `db:migrate:pg` only                     |
+| `tenantforge_app`         | nothing | no           | the running application (`POSTGRES_URL`) |
+| `tenantforge_crosstenant` | nothing | yes          | outbox relay + billing webhook resolver  |
+
+The split is load-bearing for the isolation added next phase: a table's owner bypasses a
+row-level-security policy unless it is `FORCE`d, and any `BYPASSRLS` role ignores policies
+entirely. If the runtime role owned its tables or could bypass, isolation would pass every
+test and enforce nothing. `apps/api/src/infra/postgres-roles.integration.spec.ts` asserts
+the runtime role owns no tables and cannot bypass.
+
+Grants cover existing tables **and** default privileges cover future ones — without the
+latter, the first table a later migration adds would be invisible to the runtime role and
+the break would surface in that deployment, not this one.
+
+### Postgres connection pool sizing
+
+`POSTGRES_POOL_MAX` is the per-instance ceiling (default 10). It matters more than the
+MongoDB pool because the isolation model holds one connection for the whole request —
+tenant context is set with `SET LOCAL` and must stay pinned to that connection — so
+`POSTGRES_POOL_MAX` effectively bounds per-instance request concurrency.
+
+The number that must not be exceeded is the managed database's connection limit:
+
+```
+POSTGRES_POOL_MAX  ×  autoscaling maxScale  +  headroom for migrations/admin  ≤  server max_connections
+```
+
+With `maxScale: 10` (see `deploy/cloudrun/service.yaml`) and a pool of 10, that is ~100
+connections plus headroom. Raising either multiplier without checking the server limit is
+how a serverless autoscaler takes down the database it depends on.
 
 ## Deployment
 

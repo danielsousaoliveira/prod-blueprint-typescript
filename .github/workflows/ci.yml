@@ -121,6 +121,18 @@ jobs:
           MONGO_URL: mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
           MONGO_DB_NAME: scheduler_e2e
           REDIS_URL: redis://localhost:6379
+          # Postgres is now a required dependency of the system, so the shared env schema
+          # the mongo migrate step validates includes these.
+          POSTGRES_URL: postgres://tenantforge_app:app@localhost:5432/tenantforge
+          POSTGRES_MIGRATION_URL: postgres://tenantforge_owner:owner@localhost:5432/tenantforge
+          POSTGRES_CROSS_TENANT_URL: postgres://tenantforge_crosstenant:crosstenant@localhost:5432/tenantforge
+
+      # Postgres migrations run as their own explicit deploy step, using the owner
+      # connection — never the runtime one. No feature reads Postgres yet; this proves
+      # the runner works against a real database and leaves the schema in place.
+      - run: npm run db:migrate:pg
+        env:
+          POSTGRES_MIGRATION_URL: postgres://tenantforge_owner:owner@localhost:5432/tenantforge
 
       # Playwright starts the API and the web dev server itself (see webServer in
       # playwright.config.ts) and waits for both to answer before running anything.
@@ -180,6 +192,9 @@ jobs:
             -e MONGO_URL='mongodb://localhost:27017/?replicaSet=rs0&directConnection=true' \
             -e MONGO_DB_NAME=scheduler_smoke \
             -e REDIS_URL=redis://localhost:6379 \
+            -e POSTGRES_URL='postgres://tenantforge_app:app@localhost:5432/tenantforge' \
+            -e POSTGRES_MIGRATION_URL='postgres://tenantforge_owner:owner@localhost:5432/tenantforge' \
+            -e POSTGRES_CROSS_TENANT_URL='postgres://tenantforge_crosstenant:crosstenant@localhost:5432/tenantforge' \
             scheduler-api:${{ github.sha }}
           for i in $(seq 1 30); do
             if curl -sf localhost:8080/health > /dev/null; then echo "healthy"; break; fi
@@ -215,8 +230,13 @@ jobs:
 
       # Placeholder — a real deployment authenticates here, then pushes to Artifact
       # Registry and triggers the migration job BEFORE replacing the service. See
-      # docs/cloud-mapping.md for the ordering and why it matters.
+      # docs/cloud-mapping.md for the ordering and why it matters, and
+      # deploy/postgres/README.md for the one-time role bootstrap that has to happen
+      # before the first migration.
       - name: Publish (configure registry credentials to enable)
         run: |
-          echo "Would push scheduler-api:${{ github.sha }} to Artifact Registry,"
-          echo "then run the migration job, then replace the Cloud Run service."
+          echo "One-time, on a new database: apply deploy/postgres/init/*.sql as a"
+          echo "  superuser to create the three roles (see deploy/postgres/README.md)."
+          echo "Then, every deploy: push scheduler-api:${{ github.sha }} to Artifact"
+          echo "  Registry, run the migration job (POSTGRES_MIGRATION_URL = owner role),"
+          echo "  then replace the Cloud Run service."

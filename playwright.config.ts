@@ -67,6 +67,14 @@ export default defineConfig({
         MONGO_URL: 'mongodb://localhost:27017/?replicaSet=rs0&directConnection=true',
         MONGO_DB_NAME: 'scheduler_e2e',
         REDIS_URL: 'redis://localhost:6379',
+        // Postgres is up (docker compose --wait) but no feature reads it yet — the API
+        // just needs the connection strings to boot and to report the database in its
+        // readiness check. Runtime role for the pool, owner role for migrations.
+        POSTGRES_URL: 'postgres://tenantforge_app:app@localhost:5432/tenantforge',
+        POSTGRES_MIGRATION_URL:
+          'postgres://tenantforge_owner:owner@localhost:5432/tenantforge',
+        POSTGRES_CROSS_TENANT_URL:
+          'postgres://tenantforge_crosstenant:crosstenant@localhost:5432/tenantforge',
         // Turns on MSW inside the API process AND registers the test-support route.
         // Explicit rather than keyed on NODE_ENV, which is 'production' here on purpose so
         // the production code paths are the ones under test.

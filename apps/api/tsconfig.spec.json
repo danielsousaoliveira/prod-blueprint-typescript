@@ -19,5 +19,5 @@
   "exclude": ["node_modules", "dist"],
   // `test/` holds shared harnesses (Testcontainers setup) that live outside src/ because
   // they are not application code and must never be built.
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "drizzle.config.ts"]
 }
