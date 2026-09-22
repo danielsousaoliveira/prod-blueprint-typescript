@@ -1,14 +1,17 @@
 import { Queue, Worker } from 'bullmq';
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
-import { OUTBOX_COLLECTION, type OutboxMessage } from './domain/outbox';
-import { MongoOutboxRepository } from './persistence/mongo-outbox.repository';
-import { OutboxRelay } from './application/outbox-relay.service';
-import { type MongoHarness, startMongoHarness } from '../../../../test/mongo-harness';
-import { APPOINTMENTS_COLLECTION } from '../../../demonstration/persistence/migrations';
-import { MongoAppointmentRepository } from '../../../demonstration/modules/appointments/persistence/mongo-appointment.repository';
-import { SlotTakenError } from '../../../demonstration/modules/appointments/domain/appointment.repository';
-import type { Appointment } from '../../../demonstration/modules/appointments/domain/appointment';
-import { RecordingNotificationProvider } from '../../../demonstration/modules/notifications/domain/notification.provider';
+import {
+  OUTBOX_COLLECTION,
+  type OutboxMessage,
+} from '../starter/modules/outbox/domain/outbox';
+import { MongoOutboxRepository } from '../starter/modules/outbox/persistence/mongo-outbox.repository';
+import { OutboxRelay } from '../starter/modules/outbox/application/outbox-relay.service';
+import { type MongoHarness, startMongoHarness } from '../../test/mongo-harness';
+import { APPOINTMENTS_COLLECTION } from './persistence/migrations';
+import { MongoAppointmentRepository } from './modules/appointments/persistence/mongo-appointment.repository';
+import { SlotTakenError } from './modules/appointments/domain/appointment.repository';
+import type { Appointment } from './modules/appointments/domain/appointment';
+import { RecordingNotificationProvider } from './modules/notifications/domain/notification.provider';
 
 jest.setTimeout(180_000);
 

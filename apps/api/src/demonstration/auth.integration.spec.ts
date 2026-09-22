@@ -5,56 +5,56 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { DateTime } from 'luxon';
-import { RedisService } from '../../infra/redis.service';
-import { MongoService } from '../../infra/mongo.service';
-import { PostgresService } from '../../infra/postgres.service';
-import { ProblemDetailsFilter } from '../../shared/http/problem-details';
+import { RedisService } from '../starter/infra/redis.service';
+import { MongoService } from '../starter/infra/mongo.service';
+import { PostgresService } from '../starter/infra/postgres.service';
+import { ProblemDetailsFilter } from '../starter/shared/http/problem-details';
 import {
   IDEMPOTENCY_STORE,
   InMemoryIdempotencyStore,
-} from '../../shared/idempotency/idempotency.store';
+} from '../starter/shared/idempotency/idempotency.store';
 import {
   DISTRIBUTED_LOCK,
   InMemoryDistributedLock,
-} from '../../shared/locking/distributed-lock';
-import { type MongoHarness, startMongoHarness } from '../../../../test/mongo-harness';
+} from '../starter/shared/locking/distributed-lock';
+import { type MongoHarness, startMongoHarness } from '../../test/mongo-harness';
 import {
   createAuthHarness,
   TEST_PASSWORD,
   type AuthHarness,
-} from '../../../../test/auth-harness';
-import { AvailabilityCache } from '../../../demonstration/modules/availability/application/availability.cache';
-import { AvailabilityService } from '../../../demonstration/modules/availability/application/availability.service';
+} from '../../test/auth-harness';
+import { AvailabilityCache } from './modules/availability/application/availability.cache';
+import { AvailabilityService } from './modules/availability/application/availability.service';
 import {
   AVAILABILITY_REPOSITORY,
   type DoctorSchedule,
-} from '../../../demonstration/modules/availability/domain/availability.repository';
-import { MongoAvailabilityRepository } from '../../../demonstration/modules/availability/persistence/mongo-availability.repository';
-import { AppointmentService } from '../../../demonstration/modules/appointments/application/appointment.service';
-import { APPOINTMENT_REPOSITORY } from '../../../demonstration/modules/appointments/domain/appointment.repository';
-import { MongoAppointmentRepository } from '../../../demonstration/modules/appointments/persistence/mongo-appointment.repository';
+} from './modules/availability/domain/availability.repository';
+import { MongoAvailabilityRepository } from './modules/availability/persistence/mongo-availability.repository';
+import { AppointmentService } from './modules/appointments/application/appointment.service';
+import { APPOINTMENT_REPOSITORY } from './modules/appointments/domain/appointment.repository';
+import { MongoAppointmentRepository } from './modules/appointments/persistence/mongo-appointment.repository';
 import {
   AppointmentsController,
   AvailabilityController,
-} from '../../../demonstration/modules/appointments/api/appointments.controller';
+} from './modules/appointments/api/appointments.controller';
 import {
   DOCTOR_REPOSITORY,
   PATIENT_REPOSITORY,
-} from '../../../demonstration/modules/doctors/domain/doctor.repository';
+} from './modules/doctors/domain/doctor.repository';
 import {
   MongoDoctorRepository,
   MongoPatientRepository,
-} from '../../../demonstration/modules/doctors/persistence/mongo-doctor.repository';
+} from './modules/doctors/persistence/mongo-doctor.repository';
+import { AppointmentsResolver, DoctorResolver } from './graphql/appointments.resolver';
 import {
-  AppointmentsResolver,
-  DoctorResolver,
-} from '../../../demonstration/graphql/appointments.resolver';
-import { createLoaders, type GraphQLContext } from '../graphql/dataloaders';
-import { AuthController } from './api/auth.controller';
-import { CsrfMiddleware } from './csrf.middleware';
-import { ENV, type Env } from '../../config/env';
-import { HealthController } from '../health/health.controller';
-import { HealthService } from '../health/health.service';
+  createLoaders,
+  type GraphQLContext,
+} from '../starter/modules/graphql/dataloaders';
+import { AuthController } from '../starter/modules/auth/api/auth.controller';
+import { CsrfMiddleware } from '../starter/modules/auth/csrf.middleware';
+import { ENV, type Env } from '../starter/config/env';
+import { HealthController } from '../starter/modules/health/health.controller';
+import { HealthService } from '../starter/modules/health/health.service';
 
 /**
  * ============================================================================
