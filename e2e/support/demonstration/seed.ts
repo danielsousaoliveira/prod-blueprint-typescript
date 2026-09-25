@@ -1,6 +1,6 @@
 import { MongoClient } from 'mongodb';
 import { DateTime } from 'luxon';
-import { hashPassword } from '../../apps/api/src/starter/modules/auth/domain/password';
+import { DB_NAME, MONGO_URL, seedUser, uniqueSuffix } from '../starter/seed';
 
 /**
  * Seeds a doctor with a schedule, directly in MongoDB.
@@ -25,13 +25,12 @@ import { hashPassword } from '../../apps/api/src/starter/modules/auth/domain/pas
  * Seeding through the DATABASE rather than the API is deliberate too: setup should not
  * depend on the endpoints under test. If booking is broken, the test should fail on the
  * assertion about booking, not while arranging its fixtures.
+ *
+ * The account creation itself is delegated to `support/starter/seed.ts` — that is the
+ * foundation layer every project shares, and duplicating it here would mean the two
+ * projects could silently drift on how a user document is shaped.
  * ============================================================================
  */
-
-const MONGO_URL =
-  process.env.E2E_MONGO_URL ??
-  'mongodb://localhost:27017/?replicaSet=rs0&directConnection=true';
-const DB_NAME = process.env.E2E_MONGO_DB ?? 'scheduler_e2e';
 
 export interface SeededDoctor {
   readonly doctorId: string;
@@ -44,15 +43,6 @@ export interface SeededDoctor {
   readonly patientEmail: string;
   readonly password: string;
 }
-
-/**
- * The password every seeded account shares.
- *
- * A constant, because these are throwaway accounts in a throwaway database and varying it
- * per test would buy nothing except slower runs — argon2 is deliberately expensive, and
- * each unique password is one more hash to compute at seed time.
- */
-export const E2E_PASSWORD = 'e2e-password-123';
 
 /**
  * The next WEEKDAY inside the window the app actually displays.
@@ -75,10 +65,13 @@ function targetDay(): DateTime {
 }
 
 export async function seedDoctor(label: string): Promise<SeededDoctor> {
-  const suffix = `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const suffix = uniqueSuffix(label);
   const doctorId = `doctor-${suffix}`;
   const patientId = `patient-${suffix}`;
   const clinicZone = 'Europe/Lisbon';
+
+  const doctorUser = await seedUser('doctor', suffix, doctorId);
+  const patientUser = await seedUser('patient', suffix, patientId);
 
   const client = new MongoClient(MONGO_URL);
   await client.connect();
@@ -120,58 +113,14 @@ export async function seedDoctor(label: string): Promise<SeededDoctor> {
         { upsert: true },
       );
 
-    /**
-     * ============================================================================
-     * USER ACCOUNTS, HASHED THE SAME WAY THE APPLICATION HASHES THEM
-     * ============================================================================
-     *
-     * Seeded directly into MongoDB, like everything else here — setup must not depend on
-     * the endpoints under test. But the hash is produced by importing the APPLICATION's
-     * `hashPassword`, not by writing an argon2 call here.
-     *
-     * That matters: a second, independent hashing call in the test harness is a second
-     * definition of the password format. Change the parameters in the app and this file
-     * keeps producing hashes in the old format — which still verify, so nothing fails,
-     * and the e2e suite quietly stops exercising the real configuration. Importing the
-     * real function means there is one definition and no way for them to drift.
-     * ============================================================================
-     */
-    const passwordHash = await hashPassword(E2E_PASSWORD);
-    const doctorEmail = `${doctorId}@e2e.test`;
-    const patientEmail = `${patientId}@e2e.test`;
-
-    await db.collection('users').replaceOne(
-      { _id: `user-${doctorId}` as never },
-      {
-        email: doctorEmail,
-        passwordHash,
-        role: 'doctor',
-        profileId: doctorId,
-        createdAt: Date.now(),
-      },
-      { upsert: true },
-    );
-
-    await db.collection('users').replaceOne(
-      { _id: `user-${patientId}` as never },
-      {
-        email: patientEmail,
-        passwordHash,
-        role: 'patient',
-        profileId: patientId,
-        createdAt: Date.now(),
-      },
-      { upsert: true },
-    );
-
     return {
       doctorId,
       patientId,
       clinicZone,
       bookingDate: targetDay().toISODate() ?? '',
-      doctorEmail,
-      patientEmail,
-      password: E2E_PASSWORD,
+      doctorEmail: doctorUser.email,
+      patientEmail: patientUser.email,
+      password: doctorUser.password,
     };
   } finally {
     await client.close();

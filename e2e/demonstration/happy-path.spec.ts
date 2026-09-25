@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { findAppointments, seedDoctor } from './support/seed';
-import { doctorPage, patientPage, signIn } from './support/login';
+import { findAppointments, seedDoctor } from '../support/demonstration/seed';
+import { doctorPage, patientPage, signIn } from '../support/demonstration/login';
 
 /**
  * End-to-end: a real browser, a real API, a real MongoDB and Redis.

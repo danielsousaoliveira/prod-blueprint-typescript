@@ -135,7 +135,8 @@ jobs:
           POSTGRES_MIGRATION_URL: postgres://tenantforge_owner:owner@localhost:5432/tenantforge
 
       # Playwright starts the API and the web dev server itself (see webServer in
-      # playwright.config.ts) and waits for both to answer before running anything.
+      # playwright.config.ts) and waits for both to answer before running anything. With
+      # no --project flag this runs BOTH the starter and demonstration projects.
       - run: npm run test:e2e
 
       - if: failure()
