@@ -5,9 +5,8 @@
  * WHY BOTH — AND WHY NO APOLLO
  * ============================================================================
  *
- * GraphQL for the CALENDAR read: it fetches availability, the doctor, and existing
- * appointments in one round trip, which is the documented design choice that makes GraphQL's
- * genuine win. REST for MUTATIONS: they need status codes (409 for a lost race) and the
+ * GraphQL for reads that benefit from fetching several related things in one round trip.
+ * REST for MUTATIONS: they need status codes (409 for a lost race) and the
  * `Idempotency-Key` header, both of which GraphQL flattens into a 200 with an errors array.
  *
  * Deliberately NO Apollo Client or urql. TanStack Query already provides caching,
@@ -73,7 +72,7 @@ async function parseProblem(response: Response): Promise<ProblemDetails> {
  *
  * Being explicit costs nothing and states the intent: this client is cookie-authenticated.
  */
-async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
     credentials: 'include',
@@ -106,8 +105,8 @@ async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
  *
  * Note the error handling: GraphQL returns HTTP 200 even for failures, so checking
  * `response.ok` is not enough — the `errors` array has to be inspected explicitly. That
- * is one of REST's advantages made concrete (documented design choice): every proxy and monitoring
- * tool in the path sees a successful request.
+ * is one of REST's advantages made concrete: every proxy and monitoring tool in the path
+ * sees a successful request.
  */
 export async function graphql<T>(
   query: string,
@@ -144,131 +143,7 @@ export async function graphql<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Types mirroring the API contract.
-// ---------------------------------------------------------------------------
-
-export type AppointmentStatus =
-  'REQUESTED' | 'CONFIRMED' | 'COUNTER_PROPOSED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
-
-export interface Appointment {
-  id: string;
-  doctorId: string;
-  patientId: string;
-  status: AppointmentStatus;
-  startsAt: string;
-  endsAt: string;
-  requestedStartsAt: string;
-  requestedEndsAt: string;
-  proposedStartsAt: string | null;
-  proposedEndsAt: string | null;
-  createdAt: string;
-}
-
-export interface Slot {
-  startsAt: string;
-  endsAt: string;
-}
-
-export interface Availability {
-  doctorId: string;
-  timezone: string;
-  slots: Slot[];
-}
-
-// ---------------------------------------------------------------------------
-// The calendar query — GraphQL, one round trip.
-// ---------------------------------------------------------------------------
-
-const CALENDAR_QUERY = `
-  query Calendar($input: AvailabilityInputGql!) {
-    availabilityFor(input: $input) {
-      doctorId
-      timezone
-      slots { startsAt endsAt }
-    }
-    # No arguments: the server scopes this to the signed-in user. The doctorId argument
-    # was removed from the schema, so passing one is now a validation error rather than a
-    # silently-ignored filter.
-    appointments {
-      id
-      status
-      startsAt
-      endsAt
-      requestedStartsAt
-      requestedEndsAt
-      proposedStartsAt
-      proposedEndsAt
-      createdAt
-      doctorId
-      patientId
-      doctor { id name specialty }
-    }
-  }
-`;
-
-export interface CalendarData {
-  availabilityFor: Availability | null;
-  appointments: (Appointment & {
-    doctor: { id: string; name: string; specialty: string } | null;
-  })[];
-}
-
-export function fetchCalendar(
-  doctorId: string,
-  range: { from: string; to: string },
-): Promise<CalendarData> {
-  // Availability AND appointments AND the doctor, in ONE request. In REST this is three
-  // round trips or a bespoke `?expand=` parameter.
-  return graphql<CalendarData>(CALENDAR_QUERY, {
-    input: { doctorId, from: range.from, to: range.to },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Mutations — REST, for status codes and idempotency.
-// ---------------------------------------------------------------------------
-
-export function requestAppointment(input: {
-  doctorId: string;
-  startsAt: string;
-  endsAt: string;
-  idempotencyKey: string;
-}): Promise<Appointment> {
-  const { idempotencyKey, ...body } = input;
-  return rest<Appointment>('/v1/appointments', {
-    method: 'POST',
-    // Generated per booking ATTEMPT, not per retry, so a network-level retry of the same
-    // attempt is deduplicated while a genuinely new booking gets a new key.
-    headers: { 'idempotency-key': idempotencyKey },
-    body: JSON.stringify(body),
-  });
-}
-
-const transition = (id: string, action: string, body?: unknown) =>
-  rest<Appointment>(`/v1/appointments/${id}/${action}`, {
-    method: 'POST',
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-export const acceptAppointment = (id: string) => transition(id, 'accept');
-// `by` is no longer sent: the server derives it from the session, because a client that
-// can write the audit trail can write whatever it likes into it.
-export const declineAppointment = (id: string) => transition(id, 'decline');
-export const proposeNewTime = (id: string, slot: Slot) => transition(id, 'propose', slot);
-export const patientAcceptProposal = (id: string) => transition(id, 'patient-accept');
-export const patientDeclineProposal = (id: string) => transition(id, 'patient-decline');
-export const cancelAppointment = (id: string, reason?: string) =>
-  transition(id, 'cancel', reason ? { reason } : {});
-
-/**
- * The caller's appointments. No filter parameters, because the server scopes by session —
- * `doctorId`/`patientId` were removed from the endpoint entirely (they used to let anyone
- * read the whole database).
- */
-export const listAppointments = () => rest<Appointment[]>('/v1/appointments');
-
-// ---------------------------------------------------------------------------
-// Auth
+// Auth — foundation, not domain-specific.
 // ---------------------------------------------------------------------------
 
 export interface SessionInfo {

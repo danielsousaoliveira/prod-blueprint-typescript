@@ -1,12 +1,12 @@
 import type { ComponentType } from 'react';
+import { SchedulerPage } from './demonstration/scheduler/SchedulerPage';
 
 /**
  * The one sanctioned edge from the starter frontend to the demonstration frontend.
  *
- * There is no starter/demonstration split in `apps/web` yet, and no router — both land
- * in a later phase. This file only fixes the shape that phase will populate, so routes
- * and navigation entries have one declared home from the start rather than being
- * invented ad hoc once a router exists.
+ * `starter/` (sign-in, the authenticated layout, navigation, settings, the router) never
+ * imports `demonstration/` directly. This file is the seam: it imports the demonstration
+ * screens and hands the starter router their routes and nav entries as plain data.
  */
 
 export interface RouteEntry {
@@ -25,6 +25,6 @@ export interface DemonstrationRegistry {
 }
 
 export const demonstrationRegistry: DemonstrationRegistry = {
-  routes: [],
-  navEntries: [],
+  routes: [{ path: '/', component: SchedulerPage }],
+  navEntries: [{ label: 'Scheduler', path: '/' }],
 };

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { ApiError, Slot } from '../api/client';
+import type { ApiError } from '../../starter/api/client';
+import type { Slot } from '../api/client';
 import { formatSlot, groupByViewerDay } from '../lib/time';
 
 /**

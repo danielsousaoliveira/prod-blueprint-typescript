@@ -7,9 +7,6 @@ import {
   declineAppointment,
   fetchCalendar,
   listAppointments,
-  login,
-  logout,
-  fetchSession,
   patientAcceptProposal,
   patientDeclineProposal,
   proposeNewTime,
@@ -38,20 +35,15 @@ export const keys = {
     // filter that no longer exists.
     mine: ['appointments', 'mine'] as const,
   },
-  session: ['session'] as const,
 };
 
 /**
  * How often to poll for updates.
  *
- * POLLING, not the GraphQL subscription — a deliberate reversal of the obvious choice,
- * for the reason documented in documented design choice. Cloud Run bills for connection duration,
- * caps request timeout and has no session affinity by default, and the in-process PubSub
- * does not fan out across instances anyway. A doctor's inbox tolerates ten seconds of
- * latency perfectly well; an appointment request is not a chat message.
- *
- * The subscription exists in the API and works. Choosing not to use it from the browser
- * is a deployment decision, not an admission that it is broken.
+ * POLLING, not a subscription — a deliberate deployment choice, since the hosting
+ * platform bills for connection duration, caps request timeout and has no session
+ * affinity by default. A doctor's inbox tolerates ten seconds of latency perfectly well;
+ * an appointment request is not a chat message.
  */
 const POLL_INTERVAL_MS = 10_000;
 
@@ -78,72 +70,15 @@ export function useMyAppointments() {
 }
 
 /**
- * Who am I?
- *
- * `retry: false` because a 401 here is an ANSWER, not a failure — it means "signed out",
- * and retrying it three times just delays the login screen.
+ * Everything a domain cache holds. Exposed so the starter shell can clear it on
+ * sign-out without importing this module's query functions directly.
  */
-export function useSession() {
-  return useQuery({
-    queryKey: keys.session,
-    queryFn: fetchSession,
-    retry: false,
-    staleTime: Infinity,
-  });
-}
-
-export function useLogin() {
+export function useClearDemonstrationCaches() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { email: string; password: string }) =>
-      login(input.email, input.password),
-    onSuccess: (session) => {
-      // Seed the cache directly rather than invalidating: the login response already IS
-      // the session, so refetching it would be a second round trip for data in hand.
-      queryClient.setQueryData(keys.session, session);
-    },
-  });
-}
-
-export function useLogout() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: logout,
-    onSuccess: () => {
-      /**
-       * ============================================================================
-       * ORDER MATTERS, AND `queryClient.clear()` IS THE WRONG TOOL HERE
-       * ============================================================================
-       *
-       * The obvious implementation is `queryClient.clear()` — wipe everything, the user
-       * is gone. It empties the cache correctly, and the UI does not update at all.
-       *
-       * `clear()` DESTROYS the query objects that mounted observers are bound to. The
-       * `useSession` observer in `App` is left holding a destroyed query: it neither
-       * refetches nor resets, and keeps reporting the last data it saw. A subsequent
-       * `setQueryData` then creates a BRAND NEW query that nothing is observing, so it
-       * notifies nobody.
-       *
-       * The symptom was a logout that worked perfectly on the server — cookie cleared,
-       * session destroyed, every later request 401 — while the browser carried on
-       * rendering the signed-in shell full of "could not load availability" errors. The
-       * user is signed out and the app will not admit it. Nothing throws, and the network
-       * tab looks exactly right, which is what made it slow to find.
-       *
-       * So: write the session value FIRST, through the live query the observer is
-       * actually watching. That notifies it and re-renders straight to the login page.
-       * Then drop the data caches, whose observers have unmounted by then.
-       * ============================================================================
-       */
-      queryClient.setQueryData(keys.session, null);
-
-      // Everything cached belongs to the user who just signed out. Leaving their
-      // appointments in memory for whoever signs in next on this browser is a data leak,
-      // and invalidation would serve the stale data once while refetching.
-      queryClient.removeQueries({ queryKey: keys.calendar.all });
-      queryClient.removeQueries({ queryKey: keys.appointments.all });
-    },
-  });
+  return () => {
+    queryClient.removeQueries({ queryKey: keys.calendar.all });
+    queryClient.removeQueries({ queryKey: keys.appointments.all });
+  };
 }
 
 /**
