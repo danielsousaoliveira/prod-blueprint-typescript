@@ -11,7 +11,7 @@ import { APPOINTMENTS_COLLECTION } from './persistence/migrations';
 import { MongoAppointmentRepository } from './modules/appointments/persistence/mongo-appointment.repository';
 import { SlotTakenError } from './modules/appointments/domain/appointment.repository';
 import type { Appointment } from './modules/appointments/domain/appointment';
-import { RecordingNotificationProvider } from './modules/notifications/domain/notification.provider';
+import { RecordingNotificationProvider } from '../starter/modules/notifications/domain/notification.provider';
 
 jest.setTimeout(180_000);
 

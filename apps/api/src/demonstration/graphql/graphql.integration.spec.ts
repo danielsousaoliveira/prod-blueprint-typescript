@@ -41,11 +41,8 @@ import {
 import { ComplexityPlugin } from '../../starter/modules/graphql/complexity.plugin';
 import cookieParser from 'cookie-parser';
 import { createAuthHarness, type AuthHarness } from '../../../test/auth-harness';
-import {
-  createLoaders,
-  type GraphQLContext,
-  type Loaders,
-} from '../../starter/modules/graphql/dataloaders';
+import type { GraphQLContext } from '../../starter/modules/graphql/dataloaders';
+import { createDemonstrationLoaders } from './loaders';
 import { MAX_DEPTH, depthLimit } from '../../starter/modules/graphql/query-guards';
 
 jest.setTimeout(180_000);
@@ -60,7 +57,7 @@ let patientRepo: MongoPatientRepository;
  * what a module-scoped DataLoader would do. Default is per-request, as in production.
  */
 let useSharedLoaders = false;
-let sharedLoaders: Loaders | null = null;
+let sharedLoaders: ReturnType<typeof createDemonstrationLoaders> | null = null;
 
 const SLOT_BASE = DateTime.fromISO('2027-06-01T08:00', { zone: 'utc' });
 
@@ -100,10 +97,13 @@ beforeAll(async () => {
         // uninteresting reason.
         context: (ctx: { req?: unknown }): GraphQLContext => {
           if (useSharedLoaders) {
-            sharedLoaders ??= createLoaders(doctorRepo, patientRepo);
+            sharedLoaders ??= createDemonstrationLoaders(doctorRepo, patientRepo);
             return { loaders: sharedLoaders, req: ctx.req };
           }
-          return { loaders: createLoaders(doctorRepo, patientRepo), req: ctx.req };
+          return {
+            loaders: createDemonstrationLoaders(doctorRepo, patientRepo),
+            req: ctx.req,
+          };
         },
         formatError: (error) => ({
           message: error.message,

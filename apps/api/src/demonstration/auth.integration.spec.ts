@@ -46,10 +46,8 @@ import {
   MongoPatientRepository,
 } from './modules/doctors/persistence/mongo-doctor.repository';
 import { AppointmentsResolver, DoctorResolver } from './graphql/appointments.resolver';
-import {
-  createLoaders,
-  type GraphQLContext,
-} from '../starter/modules/graphql/dataloaders';
+import type { GraphQLContext } from '../starter/modules/graphql/dataloaders';
+import { createDemonstrationLoaders } from './graphql/loaders';
 import { AuthController } from '../starter/modules/auth/api/auth.controller';
 import { CsrfMiddleware } from '../starter/modules/auth/csrf.middleware';
 import { ENV, type Env } from '../starter/config/env';
@@ -126,7 +124,7 @@ beforeAll(async () => {
         autoSchemaFile: true,
         sortSchema: true,
         context: (ctx: { req?: unknown }): GraphQLContext => ({
-          loaders: createLoaders(doctorRepo, patientRepo),
+          loaders: createDemonstrationLoaders(doctorRepo, patientRepo),
           req: ctx.req,
         }),
         formatError: (error) => ({

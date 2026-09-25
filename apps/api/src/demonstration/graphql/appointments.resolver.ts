@@ -1,4 +1,5 @@
 import { Inject } from '@nestjs/common';
+import type DataLoader from 'dataloader';
 import {
   Args,
   Context,
@@ -23,7 +24,9 @@ import type { Appointment } from '../modules/appointments/domain/appointment';
 import {
   DOCTOR_REPOSITORY,
   PATIENT_REPOSITORY,
+  type Doctor,
   type DoctorRepository,
+  type Patient,
   type PatientRepository,
 } from '../modules/doctors/domain/doctor.repository';
 import type { GraphQLContext } from '../../starter/modules/graphql/dataloaders';
@@ -140,7 +143,8 @@ export class AppointmentsResolver {
     @Parent() appointment: AppointmentGql,
     @Context() context: GraphQLContext,
   ): Promise<DoctorGql | null> {
-    return context.loaders.doctor.load(appointment.doctorId);
+    const doctorLoader = context.loaders.doctor as DataLoader<string, Doctor | null>;
+    return doctorLoader.load(appointment.doctorId);
   }
 
   @ResolveField(() => PatientGql, { nullable: true })
@@ -148,7 +152,8 @@ export class AppointmentsResolver {
     @Parent() appointment: AppointmentGql,
     @Context() context: GraphQLContext,
   ): Promise<PatientGql | null> {
-    return context.loaders.patient.load(appointment.patientId);
+    const patientLoader = context.loaders.patient as DataLoader<string, Patient | null>;
+    return patientLoader.load(appointment.patientId);
   }
 
   // --- Mutations -------------------------------------------------------------

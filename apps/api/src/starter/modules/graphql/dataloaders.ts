@@ -1,10 +1,4 @@
 import DataLoader from 'dataloader';
-import type {
-  Doctor,
-  DoctorRepository,
-  Patient,
-  PatientRepository,
-} from '../../demonstration-registry';
 
 /**
  * Per-request DataLoaders.
@@ -51,39 +45,44 @@ import type {
  * which is why it gets this much comment.
  * ============================================================================
  */
-export interface Loaders {
-  readonly doctor: DataLoader<string, Doctor | null>;
-  readonly patient: DataLoader<string, Patient | null>;
+/**
+ * A repository capable of batch-loading entities of type `TEntity` by id.
+ *
+ * Deliberately just this one method: it is the only shape DataLoader's batch function
+ * needs, and it is what lets this file build a loader for ANY entity without knowing
+ * what that entity is. The concrete entity types (Doctor, Patient, ...) belong to
+ * whichever tree owns them — this file never names one.
+ */
+export interface BatchLookup<TId, TEntity> {
+  findByIds(ids: readonly TId[]): Promise<Map<TId, TEntity>>;
 }
 
 /**
  * Called once per request. Never memoise the result of this function.
  */
-export function createLoaders(
-  doctors: DoctorRepository,
-  patients: PatientRepository,
-): Loaders {
-  return {
-    doctor: new DataLoader<string, Doctor | null>(async (ids) => {
-      const found = await doctors.findByIds(ids);
-      // DataLoader REQUIRES the returned array to align exactly with the input ids —
-      // same length, same order. A missing record must become `null` in its position
-      // rather than being omitted, or every subsequent result shifts by one and each
-      // appointment gets the wrong doctor. Mapping over the input ids (rather than over
-      // the query results) makes that alignment structural.
-      return ids.map((id) => found.get(id) ?? null);
-    }),
-
-    patient: new DataLoader<string, Patient | null>(async (ids) => {
-      const found = await patients.findByIds(ids);
-      return ids.map((id) => found.get(id) ?? null);
-    }),
-  };
+export function createEntityLoader<TId, TEntity>(
+  lookup: BatchLookup<TId, TEntity>,
+): DataLoader<TId, TEntity | null> {
+  return new DataLoader<TId, TEntity | null>(async (ids) => {
+    const found = await lookup.findByIds(ids);
+    // DataLoader REQUIRES the returned array to align exactly with the input ids — same
+    // length, same order. A missing record must become `null` in its position rather
+    // than being omitted, or every subsequent result shifts by one and each caller gets
+    // the wrong entity. Mapping over the input ids (rather than over the query results)
+    // makes that alignment structural.
+    return ids.map((id) => found.get(id) ?? null);
+  });
 }
 
 /** Shape of the per-request GraphQL context. */
 export interface GraphQLContext {
-  readonly loaders: Loaders;
+  /**
+   * Keyed by whatever names the demonstration (or a future feature) registers, e.g.
+   * `"doctor"`, `"patient"`. Untyped here on purpose — this file has no reason to know
+   * which loaders exist. A resolver narrows the entry it needs to the concrete
+   * `DataLoader<string, T | null>` it owns.
+   */
+  readonly loaders: Readonly<Record<string, DataLoader<string, unknown>>>;
   /**
    * The underlying HTTP request, so the global `AuthGuard` and `@CurrentActor()` can
    * reach it during a GraphQL operation. `unknown` rather than Express's `Request`

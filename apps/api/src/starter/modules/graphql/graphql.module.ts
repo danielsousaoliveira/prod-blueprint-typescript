@@ -2,16 +2,10 @@ import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
 import { Inject, Module } from '@nestjs/common';
 import { GraphQLModule as NestGraphQLModule } from '@nestjs/graphql';
 import { ENV, type Env } from '../../config/env';
-import {
-  DOCTOR_REPOSITORY,
-  PATIENT_REPOSITORY,
-  demonstrationRegistry,
-  type DoctorRepository,
-  type PatientRepository,
-} from '../../demonstration-registry';
+import { demonstrationRegistry } from '../../demonstration-registry';
 import { AuthService } from '../auth/application/auth.service';
 import { ComplexityPlugin } from './complexity.plugin';
-import { createLoaders, type GraphQLContext } from './dataloaders';
+import type { GraphQLContext } from './dataloaders';
 import { MAX_DEPTH, depthLimit } from './query-guards';
 
 /**
@@ -50,12 +44,11 @@ function readCookie(header: string | undefined, name: string): string | undefine
     NestGraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       imports: [...demonstrationRegistry.graphqlModules],
-      inject: [ENV, DOCTOR_REPOSITORY, PATIENT_REPOSITORY, AuthService],
+      inject: [ENV, AuthService, ...demonstrationRegistry.loaderInjectionTokens],
       useFactory: (
         env: Env,
-        doctors: DoctorRepository,
-        patients: PatientRepository,
         auth: AuthService,
+        ...loaderDeps: unknown[]
       ): ApolloDriverConfig => ({
         /**
          * Code-first: the SDL is generated from the decorated classes.
@@ -80,11 +73,12 @@ function readCookie(header: string | undefined, name: string): string | undefine
          * THE PER-REQUEST CONTEXT.
          *
          * This factory runs once per request, so every request gets its own loaders and
-         * therefore its own cache. Hoisting `createLoaders(...)` outside this function
-         * would be a cross-request data leak, not an optimisation — see dataloaders.ts.
+         * therefore its own cache. Hoisting the call to `demonstrationRegistry.createLoaders`
+         * outside this function would be a cross-request data leak, not an optimisation —
+         * see dataloaders.ts.
          */
         context: (ctx: { req?: unknown }): GraphQLContext => ({
-          loaders: createLoaders(doctors, patients),
+          loaders: demonstrationRegistry.createLoaders(...loaderDeps),
           /**
            * The request is passed through so the guard and `@CurrentActor()` can reach
            * it. Previously this factory took no arguments at all, which meant a Nest

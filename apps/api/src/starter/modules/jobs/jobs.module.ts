@@ -9,10 +9,10 @@ import { Queue, Worker } from 'bullmq';
 import { ENV, type Env } from '../../config/env';
 import {
   NOTIFICATION_PROVIDER,
-  ReminderScheduler,
-  demonstrationRegistry,
+  HttpNotificationProvider,
   type NotificationProvider,
-} from '../../demonstration-registry';
+} from '../notifications/domain/notification.provider';
+import { ReminderScheduler } from '../notifications/application/reminder.scheduler';
 import { OutboxRelay } from '../outbox/application/outbox-relay.service';
 import { OUTBOX_REPOSITORY } from '../outbox/domain/outbox';
 import { MongoOutboxRepository } from '../outbox/persistence/mongo-outbox.repository';
@@ -133,7 +133,7 @@ class JobsRuntime implements OnApplicationShutdown {
       provide: NOTIFICATION_PROVIDER,
       inject: [ENV],
       useFactory: (env: Env): NotificationProvider =>
-        demonstrationRegistry.createNotificationProvider(
+        new HttpNotificationProvider(
           env.NOTIFICATION_PROVIDER_URL,
           env.NOTIFICATION_API_KEY,
         ),
@@ -142,7 +142,7 @@ class JobsRuntime implements OnApplicationShutdown {
     {
       provide: ReminderScheduler,
       inject: [REMINDER_QUEUE],
-      useFactory: (queue: Queue) => demonstrationRegistry.createReminderScheduler(queue),
+      useFactory: (queue: Queue) => new ReminderScheduler(queue),
     },
     {
       provide: OutboxRelay,
