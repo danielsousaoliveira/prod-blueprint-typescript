@@ -75,6 +75,24 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['apps/web/src/starter/**/*.{ts,tsx}'],
+    ignores: ['apps/web/src/registry.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/demonstration/**', '**/demonstration'],
+              message:
+                'starter/ must not import demonstration/. The one sanctioned edge is src/registry.ts.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 
   // ---------------------------------------------------------------------------
   // ARCHITECTURAL BOUNDARY, enforced by the linter rather than by code review.

@@ -24,8 +24,12 @@ function lint(fixture, ruleOptions) {
     code,
     [
       {
-        files: ['**/*.ts'],
-        languageOptions: { ecmaVersion: 2022, sourceType: 'module' },
+        files: ['**/*.ts', '**/*.tsx'],
+        languageOptions: {
+          ecmaVersion: 2022,
+          sourceType: 'module',
+          parserOptions: { ecmaFeatures: { jsx: true } },
+        },
         rules: { 'no-restricted-imports': ruleOptions },
       },
     ],
@@ -54,6 +58,13 @@ assertFires(
   'starter-imports-demonstration.ts',
   starterBoundary,
   'the starter -> demonstration boundary rule',
+);
+
+const webStarterBoundary = findConfigFor('apps/web/src/starter/**/*.{ts,tsx}');
+assertFires(
+  'web-starter-imports-demonstration.tsx',
+  webStarterBoundary,
+  'the frontend starter -> demonstration boundary rule',
 );
 
 const layering = findConfigFor('**/src/*/modules/**/domain/**');
