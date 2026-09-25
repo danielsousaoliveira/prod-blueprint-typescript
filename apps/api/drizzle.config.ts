@@ -5,13 +5,23 @@ import { defineConfig } from 'drizzle-kit';
  * Applying migrations is the runner's job (src/starter/persistence/pg/migrator.ts); drizzle-kit
  * never touches a deployed database, so `push` and `studio` are not used here.
  *
- * Generation is offline: it diffs schema.ts against the snapshot under
+ * Generation is offline: it diffs the combined schema against the snapshot under
  * migrations/foundation/meta. The credentials below exist only to satisfy the config
  * shape.
+ *
+ * `schema` is the single declared list of every Postgres schema module in the app —
+ * starter and demonstration alike — the same seam the backend registry gives the rest of
+ * the composition. The demonstration glob matches nothing today (the example domain is
+ * still Mongo-backed), but it is real: a future `demonstration/**\/schema.ts` is picked
+ * up with no config change, and deleting `demonstration/` removes it from generation
+ * without touching this file.
  */
 export default defineConfig({
   dialect: 'postgresql',
-  schema: './src/starter/persistence/pg/schema.ts',
+  schema: [
+    './src/starter/persistence/pg/schema.ts',
+    './src/demonstration/**/persistence/pg/schema.ts',
+  ],
   out: './src/starter/persistence/pg/migrations/foundation',
   migrations: {
     // Bookkeeping table lives in its own `drizzle` schema, not in `app` — the
