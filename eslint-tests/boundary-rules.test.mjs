@@ -67,6 +67,16 @@ assertFires(
   'the frontend starter -> demonstration boundary rule',
 );
 
+// A starter schema module is a starter file like any other, so it falls under the same
+// boundary rule as apps/api/src/starter/**/*.ts. Named separately because a schema file
+// importing a demonstration table is a distinct, higher-stakes failure mode (a foreign
+// key removal cannot satisfy) worth its own proof that the rule actually reaches it.
+assertFires(
+  'starter-schema-imports-demonstration-schema.ts',
+  starterBoundary,
+  'the starter boundary rule, for a starter schema module',
+);
+
 const layering = findConfigFor('**/src/*/modules/**/domain/**');
 assertFires(
   'domain-imports-postgres-driver.ts',
