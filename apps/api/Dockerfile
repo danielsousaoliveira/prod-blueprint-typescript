@@ -76,4 +76,4 @@ EXPOSE 8080
 # not forward SIGTERM to its child — so the graceful shutdown handler never runs and
 # every deploy kills in-flight requests. This one line is what makes the draining logic
 # in main.ts actually reachable.
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["node", "apps/api/dist/starter/main.js"]

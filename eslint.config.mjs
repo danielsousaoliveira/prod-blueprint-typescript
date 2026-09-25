@@ -6,7 +6,12 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      'eslint-tests/fixtures/**',
+    ],
   },
   js.configs.recommended,
 
@@ -40,6 +45,38 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
+  // STARTER/DEMONSTRATION BOUNDARY, enforced the same way as the layering rule below.
+  //
+  // `demonstration/` is the example doctor-scheduling app; `starter/` is the reusable
+  // foundation it sits on. The foundation must be deletable-and-replaceable without
+  // touching starter/ code, which only holds if starter/ never depends on it. The one
+  // sanctioned exception is demonstration-registry.ts, which exists precisely to be that
+  // seam. Applied with no test-file exemption: a spec importing the demo tree "just to
+  // set up a fixture" is the same coupling this rule exists to prevent. (The
+  // domain/application layering rule below repeats this pattern for its own files, since
+  // ESLint's flat config replaces a rule's options rather than merging them across
+  // overlapping blocks.)
+  // ---------------------------------------------------------------------------
+  {
+    files: ['apps/api/src/starter/**/*.ts'],
+    ignores: ['apps/api/src/starter/demonstration-registry.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/demonstration/**', '**/demonstration'],
+              message:
+                'starter/ must not import demonstration/. The one sanctioned edge is starter/demonstration-registry.ts.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // ARCHITECTURAL BOUNDARY, enforced by the linter rather than by code review.
   //
   // The domain and application layers must not depend on HTTP or on the database
@@ -51,7 +88,7 @@ export default tseslint.config(
   // for convenience, and the layering is gone. This makes it a build failure.
   // ---------------------------------------------------------------------------
   {
-    files: ['**/src/modules/**/domain/**/*.ts', '**/src/modules/**/application/**/*.ts'],
+    files: ['**/src/*/modules/**/domain/**', '**/src/*/modules/**/application/**'],
     ignores: ['**/*.spec.ts', '**/*.contract.ts'],
     rules: {
       'no-restricted-imports': [
@@ -69,6 +106,11 @@ export default tseslint.config(
                 'The domain and application layers must not import the MongoDB driver. Depend on the repository port instead; the adapter lives in persistence/.',
             },
             {
+              name: 'pg',
+              message:
+                'The domain and application layers must not import the Postgres driver. Depend on the repository port instead; the adapter lives in persistence/.',
+            },
+            {
               name: 'ioredis',
               message:
                 'Depend on the DistributedLock or IdempotencyStore port, not on Redis directly.',
@@ -79,6 +121,16 @@ export default tseslint.config(
               group: ['**/persistence/*', '!**/persistence/*.contract'],
               message:
                 'Depend on the repository INTERFACE in domain/, not on a concrete adapter in persistence/.',
+            },
+            {
+              group: ['**/demonstration/**', '**/demonstration'],
+              message:
+                'starter/ must not import demonstration/. The one sanctioned edge is starter/demonstration-registry.ts.',
+            },
+            {
+              group: ['drizzle-orm', 'drizzle-orm/*'],
+              message:
+                'The domain and application layers must not import Drizzle. Depend on the repository port instead; the adapter lives in persistence/.',
             },
           ],
         },
@@ -131,6 +183,17 @@ export default tseslint.config(
     files: ['**/*.config.js', '**/.*rc.js'],
     languageOptions: {
       globals: { module: 'writable', require: 'readonly', __dirname: 'readonly' },
+    },
+  },
+
+  // Standalone Node scripts that prove the boundary rules above actually fire. They run
+  // via `node`, outside any tsconfig project and outside the Jest suites, so they get
+  // Node globals and no type-aware linting.
+  {
+    files: ['eslint-tests/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: { console: 'readonly' },
     },
   },
 

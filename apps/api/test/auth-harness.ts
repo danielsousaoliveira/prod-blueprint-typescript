@@ -1,18 +1,18 @@
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import type { Provider } from '@nestjs/common';
-import type { RedisService } from '../src/infra/redis.service';
-import { ENV, type Env } from '../src/config/env';
-import { AuthService } from '../src/modules/auth/application/auth.service';
-import { LoginRateLimiter } from '../src/modules/auth/application/login-rate-limiter';
-import { SESSION_STORE } from '../src/modules/auth/application/session.store';
-import { AuthGuard } from '../src/modules/auth/auth.guard';
-import { hashPassword } from '../src/modules/auth/domain/password';
-import type { Role } from '../src/modules/auth/domain/user';
-import { USER_REPOSITORY } from '../src/modules/auth/domain/user.repository';
+import type { RedisService } from '../src/starter/infra/redis.service';
+import { ENV, type Env } from '../src/starter/config/env';
+import { AuthService } from '../src/starter/modules/auth/application/auth.service';
+import { LoginRateLimiter } from '../src/starter/modules/auth/application/login-rate-limiter';
+import { SESSION_STORE } from '../src/starter/modules/auth/application/session.store';
+import { AuthGuard } from '../src/starter/modules/auth/auth.guard';
+import { hashPassword } from '../src/starter/modules/auth/domain/password';
+import type { Role } from '../src/starter/modules/auth/domain/user';
+import { USER_REPOSITORY } from '../src/starter/modules/auth/domain/user.repository';
 import {
   InMemorySessionStore,
   InMemoryUserRepository,
-} from '../src/modules/auth/persistence/in-memory-auth';
+} from '../src/starter/modules/auth/persistence/in-memory-auth';
 
 export const TEST_COOKIE_NAME = 'sid';
 export const TEST_PASSWORD = 'test-password-123';
