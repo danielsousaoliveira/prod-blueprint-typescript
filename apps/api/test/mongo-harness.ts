@@ -1,7 +1,7 @@
 import { MongoDBContainer, type StartedMongoDBContainer } from '@testcontainers/mongodb';
 import { Db, MongoClient } from 'mongodb';
-import { runMigrations } from '../src/persistence/migrations';
-import type { MongoService } from '../src/infra/mongo.service';
+import { runMigrations } from '../src/demonstration/persistence/migrations';
+import type { MongoService } from '../src/starter/infra/mongo.service';
 
 /**
  * A real MongoDB, started in a container for the duration of a test file.

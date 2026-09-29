@@ -36,9 +36,30 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
+  /**
+   * Two independent projects, mirroring the starter/demonstration split of the rest of
+   * the codebase (`apps/api/src`, `apps/web/src`, `apps/web/src/registry.ts`).
+   *
+   * Each has its own `testDir`, so `--project=starter` or `--project=demonstration` runs
+   * exactly one of them, and running the suite with no `--project` flag runs both — that
+   * is what `npm run test:e2e` does.
+   */
   projects: [
     {
-      name: 'chromium',
+      name: 'starter',
+      testDir: './e2e/starter',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Pinned for consistency with the demonstration project and for future
+        // timezone-sensitive starter journeys (session expiry, account timestamps) — a
+        // plain sign-in test does not currently depend on it.
+        timezoneId: 'America/New_York',
+        locale: 'en-GB',
+      },
+    },
+    {
+      name: 'demonstration',
+      testDir: './e2e/demonstration',
       use: {
         ...devices['Desktop Chrome'],
         /**

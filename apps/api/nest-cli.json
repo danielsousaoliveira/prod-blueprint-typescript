@@ -6,11 +6,11 @@
     "deleteOutDir": true,
     "assets": [
       {
-        "include": "persistence/pg/migrations/**/*.sql",
+        "include": "starter/persistence/pg/migrations/**/*.sql",
         "watchAssets": false
       },
       {
-        "include": "persistence/pg/migrations/**/*.json",
+        "include": "starter/persistence/pg/migrations/**/*.json",
         "watchAssets": false
       }
     ]

@@ -102,17 +102,17 @@ same-zone case.
 
 Other useful commands:
 
-| Command                           | What it does                                                |
-| --------------------------------- | ----------------------------------------------------------- |
-| `npm run build`                   | Compile all workspaces                                      |
-| `npm run lint`                    | ESLint across the monorepo (incl. layering rules)           |
-| `npm run typecheck`               | `tsc --noEmit` per workspace, tests included                |
-| `npm run db:migrate`              | Ordered MongoDB migrations — a deploy step, never on boot   |
-| `npm run db:generate:pg`          | Generate SQL migrations from `src/persistence/pg/schema.ts` |
-| `npm run db:migrate:pg`           | Apply Postgres migrations — a deploy step, never on boot    |
-| `npm run db:explain`              | `explain()` output for every indexed query                  |
-| `npm run test:e2e:ui`             | Playwright in watch/inspect mode                            |
-| `npm run infra:up` / `infra:down` | MongoDB + Postgres + Redis                                  |
+| Command                           | What it does                                                        |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `npm run build`                   | Compile all workspaces                                              |
+| `npm run lint`                    | ESLint across the monorepo (incl. layering rules)                   |
+| `npm run typecheck`               | `tsc --noEmit` per workspace, tests included                        |
+| `npm run db:migrate`              | Ordered MongoDB migrations — a deploy step, never on boot           |
+| `npm run db:generate:pg`          | Generate SQL migrations from `src/starter/persistence/pg/schema.ts` |
+| `npm run db:migrate:pg`           | Apply Postgres migrations — a deploy step, never on boot            |
+| `npm run db:explain`              | `explain()` output for every indexed query                          |
+| `npm run test:e2e:ui`             | Playwright in watch/inspect mode                                    |
+| `npm run infra:up` / `infra:down` | MongoDB + Postgres + Redis                                          |
 
 ## Architecture
 
@@ -154,7 +154,7 @@ works in production" are the same claim.
 
 ### Where authorization lives
 
-`apps/api/src/modules/appointments/domain/state-machine.ts` — the transition table gained an
+`apps/api/src/demonstration/modules/appointments/domain/state-machine.ts` — the transition table gained an
 actor dimension:
 
 ```text
@@ -173,7 +173,7 @@ whose role may not do this (**403**). The authorization rule is enforced by the 
 
 ### Where the double-booking guarantee lives
 
-One line, in `apps/api/src/persistence/migrations/index.ts`:
+One line, in `apps/api/src/demonstration/persistence/migrations/index.ts`:
 
 ```text
 { doctorId: 1, startsAt: 1 }
@@ -211,7 +211,7 @@ superuser bootstrap on a managed instance before the first migration.
 The split is load-bearing for the isolation added next phase: a table's owner bypasses a
 row-level-security policy unless it is `FORCE`d, and any `BYPASSRLS` role ignores policies
 entirely. If the runtime role owned its tables or could bypass, isolation would pass every
-test and enforce nothing. `apps/api/src/infra/postgres-roles.integration.spec.ts` asserts
+test and enforce nothing. `apps/api/src/starter/infra/postgres-roles.integration.spec.ts` asserts
 the runtime role owns no tables and cannot bypass.
 
 Grants cover existing tables **and** default privileges cover future ones — without the

@@ -13,7 +13,7 @@ The three-role separation the tenant-isolation model depends on is defined once,
 The split is load-bearing: a table's owner bypasses a row-level-security policy unless it
 is `FORCE`d, and any `BYPASSRLS` role ignores policies entirely. If the runtime role
 owned its tables or could bypass, the isolation added next phase would pass every test
-and enforce nothing. `apps/api/src/infra/postgres-roles.integration.spec.ts` asserts the
+and enforce nothing. `apps/api/src/starter/infra/postgres-roles.integration.spec.ts` asserts the
 runtime role owns no tables and cannot bypass.
 
 ## Local development

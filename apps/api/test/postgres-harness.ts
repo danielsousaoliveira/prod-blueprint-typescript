@@ -5,7 +5,7 @@ import {
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
-import { runPgMigrations } from '../src/persistence/pg/migrator';
+import { runPgMigrations } from '../src/starter/persistence/pg/migrator';
 
 /**
  * A real Postgres, started in a container for the duration of a test file.
