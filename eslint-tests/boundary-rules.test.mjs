@@ -89,6 +89,77 @@ assertFires(
   'the domain/application layering rule (drizzle-orm)',
 );
 
+// The tenant data-access handles use `no-restricted-syntax` blocks scoped by file path, so
+// these run the real config against a virtual file path (relative to the repo root)
+// rather than extracting rule options. That is the only way to prove the allowlists.
+const repoRoot = path.resolve(here, '..');
+const repoLinter = new Linter({ cwd: repoRoot });
+
+function restrictedSyntaxHits(fixture, virtualPath) {
+  const code = readFileSync(path.join(here, 'fixtures', fixture), 'utf8');
+  const realConfig = config.filter(
+    (c) => c.rules && c.rules['no-restricted-syntax'] && Array.isArray(c.files),
+  );
+  assert.ok(
+    realConfig.length > 0,
+    'expected no-restricted-syntax blocks in eslint config',
+  );
+  const messages = repoLinter.verify(
+    code,
+    realConfig.map((c) => ({
+      files: c.files,
+      ...(c.ignores ? { ignores: c.ignores } : {}),
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module',
+      },
+      rules: c.rules,
+    })),
+    { filename: path.join(repoRoot, virtualPath) },
+  );
+  return messages.filter((m) => m.ruleId === 'no-restricted-syntax');
+}
+
+const outsideAllowlist = 'apps/api/src/starter/modules/appointments/persistence/x.ts';
+
+assert.ok(
+  restrictedSyntaxHits('imports-privileged-database.ts', outsideAllowlist).length > 0,
+  'expected importing PrivilegedDatabase from an arbitrary module to be reported',
+);
+for (const allowed of [
+  'apps/api/src/starter/infra/tenancy/x.ts',
+  'apps/api/src/starter/modules/outbox/persistence/x.ts',
+  'apps/api/src/starter/modules/jobs/x.ts',
+]) {
+  assert.equal(
+    restrictedSyntaxHits('imports-privileged-database.ts', allowed).length,
+    0,
+    `expected PrivilegedDatabase to be importable from ${allowed}`,
+  );
+}
+
+assert.ok(
+  restrictedSyntaxHits('imports-postgres-service.ts', outsideAllowlist).length > 0,
+  'expected importing PostgresService from an arbitrary module to be reported',
+);
+for (const allowed of [
+  'apps/api/src/starter/infra/x.ts',
+  'apps/api/src/starter/modules/health/x.ts',
+]) {
+  assert.equal(
+    restrictedSyntaxHits('imports-postgres-service.ts', allowed).length,
+    0,
+    `expected PostgresService to be importable from ${allowed}`,
+  );
+}
+
+// Both restrictions apply together where neither allowlist covers the file.
+assert.equal(
+  restrictedSyntaxHits('imports-privileged-database.ts', outsideAllowlist).length,
+  1,
+  'expected exactly one report for the privileged import',
+);
+
 // Sanity check: the rule options themselves do not blanket-forbid every import — only
 // the ones this suite targets. Proves assertFires above is exercising the rule, not a
 // parser failure that would report on every file regardless of content.

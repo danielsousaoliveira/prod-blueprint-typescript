@@ -113,3 +113,57 @@ a tenant table without its policy.
 ### Excluded on purpose
 
 `organisations` has no policy. See the exception under Schema.
+
+## Running code as a tenant
+
+All tenant data access goes through `TenantTransactionRunner.run(organisationId, work)` in
+`apps/api/src/starter/infra/tenancy/tenant-transaction.ts`.
+
+It checks out a connection, opens a transaction, sets `app.current_organisation` with
+`set_config($1, $2, true)` (the third argument makes it transaction-local, the values are
+bound parameters), runs `work`, then commits or rolls back and releases. The organisation id
+is validated as a uuid before any connection is taken.
+
+### Why transaction scope and not connection scope
+
+A pooled connection is reused by the next request. A session-level setting written for one
+organisation is still there when a different request borrows the connection, so under load
+one customer can read another's rows, intermittently and unreproducibly. `set_config(...,
+true)` is discarded at commit or rollback, so it cannot outlive the transaction.
+
+This is also the only mode that is safe behind a transaction-pooling proxy such as
+PgBouncer. In that mode consecutive statements of one session can land on different backend
+connections, so any session-level setting is silently unreliable. Nothing here uses one; if
+someone adds `SET`, `set_config(..., false)` or a session-level advisory lock, it will work
+in development and break behind a pooler.
+
+The pool is small on purpose (`POSTGRES_POOL_MAX`): a tenant transaction holds a connection
+for its whole duration, so that number is the real request concurrency ceiling.
+
+### The handle repositories receive
+
+Repositories depend on `TenantDb`, never on the pool. `TenantDb.query` looks up the
+transaction the runner opened for the current async call chain and throws
+`NoTenantTransactionError` if there is none, or if the transaction has already finished. A
+forgotten transaction is an error at the call site, not an empty result at the API.
+
+`PostgresService` no longer exposes its pool. Importing it outside `starter/infra` and the
+health probe fails linting.
+
+A nested `run` for the same organisation joins the open transaction; for a different
+organisation it throws.
+
+### Background work
+
+A job has no request to inherit an organisation from, so the payload carries it.
+`createTenantWorker` is the one sanctioned way to build a worker: it rejects a payload
+without a valid `organisationId` and runs the handler inside `run`. A worker built directly
+with BullMQ's `Worker` has no tenant transaction, so `TenantDb` would throw in it.
+
+### The privileged handle
+
+`PrivilegedDatabase` connects as `tenantforge_crosstenant`, which bypasses row-level
+security, for work that spans organisations (relaying the outbox in one poll). It is a
+separate injectable, and importing it outside `starter/infra`, the outbox persistence
+adapter and the jobs module fails linting. `eslint-tests/boundary-rules.test.mjs` proves
+both the restriction and the allowlist, and runs in CI.

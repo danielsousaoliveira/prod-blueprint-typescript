@@ -4,6 +4,18 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 import reactHooks from 'eslint-plugin-react-hooks';
 
+export const PRIVILEGED_DATABASE_IMPORT = {
+  selector: 'ImportDeclaration[source.value=/privileged-database$/]',
+  message:
+    'PrivilegedDatabase bypasses row-level security. It may only be imported from starter/infra, the outbox persistence adapter and the jobs module.',
+};
+
+export const POSTGRES_SERVICE_IMPORT = {
+  selector: 'ImportDeclaration[source.value=/postgres\\.service$/]',
+  message:
+    'PostgresService hands out connections with no tenant context. Depend on TenantDb and run inside TenantTransactionRunner.run() instead.',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -153,6 +165,42 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: [
+      'apps/api/src/starter/infra/**',
+      'apps/api/src/starter/modules/outbox/persistence/**',
+      'apps/api/src/starter/modules/jobs/**',
+      'apps/api/src/starter/modules/health/**',
+      'apps/api/src/demonstration/auth.integration.spec.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        PRIVILEGED_DATABASE_IMPORT,
+        POSTGRES_SERVICE_IMPORT,
+      ],
+    },
+  },
+  {
+    files: [
+      'apps/api/src/starter/modules/outbox/persistence/**/*.ts',
+      'apps/api/src/starter/modules/jobs/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': ['error', POSTGRES_SERVICE_IMPORT],
+    },
+  },
+  {
+    files: [
+      'apps/api/src/starter/modules/health/**/*.ts',
+      'apps/api/src/demonstration/auth.integration.spec.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': ['error', PRIVILEGED_DATABASE_IMPORT],
     },
   },
 
