@@ -77,16 +77,16 @@ describe('the runtime Postgres role', () => {
     await harness
       .pool('owner')
       .query(
-        "INSERT INTO app.tenants (slug, name) VALUES ('acme', 'Acme Inc') ON CONFLICT (slug) DO NOTHING",
+        "INSERT INTO app.organisations (slug, name) VALUES ('acme', 'Acme Inc') ON CONFLICT (slug) DO NOTHING",
       );
 
     await harness
       .pool('app')
-      .query("UPDATE app.tenants SET name = 'Acme' WHERE slug = 'acme'");
+      .query("UPDATE app.organisations SET name = 'Acme' WHERE slug = 'acme'");
 
     const { rows } = await harness
       .pool('app')
-      .query<{ name: string }>("SELECT name FROM app.tenants WHERE slug = 'acme'");
+      .query<{ name: string }>("SELECT name FROM app.organisations WHERE slug = 'acme'");
     expect(rows[0]?.name).toBe('Acme');
   });
 });
