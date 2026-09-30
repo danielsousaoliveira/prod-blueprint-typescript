@@ -57,3 +57,59 @@ one statement. This is covered in `tenancy-schema.integration.spec.ts`.
 A request carries a subdomain. Turning that into an organisation id has to happen before
 any tenant context exists, so the table it is read from cannot itself require one. The
 runtime role can read and write `organisations`; nothing else is exempt.
+
+## Row-level isolation
+
+`0003_tenant_isolation.sql` installs `app.current_organisation_id()` and, for each
+tenant-scoped table, enables **and forces** row-level security with one policy
+(`organisation_isolation`) that covers every command.
+
+### Forced, not just enabled
+
+A table's owner bypasses its policies unless the table is `FORCE`d. The runtime role owns
+nothing, so enabling alone would work today; forcing means it keeps working if ownership
+ever changes, and it makes the `pg_class.relforcerowsecurity` flag something a test can
+assert on.
+
+### The policy has a check clause, not only a filter
+
+`USING` filters what a statement can see and touch. Without `WITH CHECK`, an `INSERT`
+naming another organisation would be accepted, because no existing row is being filtered.
+Both clauses are identical and both call the context function.
+
+### The context function raises
+
+`app.current_organisation_id()` reads `app.current_organisation` with
+`current_setting(name, true)`, so an unset setting yields NULL instead of an error the
+function cannot classify. It then decides:
+
+| State                 | Result                  |
+| --------------------- | ----------------------- |
+| unset or empty        | raises SQLSTATE `TF001` |
+| set, not a valid uuid | raises SQLSTATE `TF002` |
+| set to a valid uuid   | returns it              |
+
+An unset context returning NULL would make `organisation_id = NULL` match nothing, and an
+empty result set reads as data loss. Raising turns a forgotten context into an immediate,
+attributable failure.
+
+The setting is written with `set_config($1, $2, true)`, which takes the value as a bound
+parameter. `SET LOCAL` cannot take a parameter, so building it from a request-derived
+string would be an injection site.
+
+The policy calls the function as `(SELECT app.current_organisation_id())`, which lets
+PostgreSQL evaluate it as an InitPlan: once, when its value is first needed, and reused for
+the rest of the statement rather than recomputed per row. That is a planner behaviour, not
+a guarantee. A scan that never needs the value, such as one over an empty table, may return
+zero rows without calling the function and so without raising `TF001`. The tests therefore
+run against tables that hold rows.
+
+### Ordering
+
+drizzle's migrator applies every pending migration inside one transaction, so a table
+created in `0002` and its policy in `0003` become visible together. No committed state has
+a tenant table without its policy.
+
+### Excluded on purpose
+
+`organisations` has no policy. See the exception under Schema.
