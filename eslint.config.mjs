@@ -176,6 +176,7 @@ export default tseslint.config(
       'apps/api/src/starter/modules/jobs/**',
       'apps/api/src/starter/modules/health/**',
       'apps/api/src/demonstration/auth.integration.spec.ts',
+      'apps/api/src/starter/modules/tenancy/tenancy.integration.spec.ts',
     ],
     rules: {
       'no-restricted-syntax': [

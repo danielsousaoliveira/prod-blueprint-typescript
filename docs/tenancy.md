@@ -167,3 +167,69 @@ security, for work that spans organisations (relaying the outbox in one poll). I
 separate injectable, and importing it outside `starter/infra`, the outbox persistence
 adapter and the jobs module fails linting. `eslint-tests/boundary-rules.test.mjs` proves
 both the restriction and the allowlist, and runs in CI.
+
+## Resolving the organisation from the request host
+
+`TenantResolutionMiddleware` (registered by `TenancyModule`) runs on every route before any
+guard, so by the time `AuthGuard` runs the request already carries `request.organisation`.
+Handlers read it with `@CurrentOrganisation()` (404 if absent) or `@OptionalOrganisation()`.
+
+The host is parsed, not string-matched: `acme.<APP_BASE_DOMAIN>` is organisation `acme`.
+
+| Host                                       | Result                             |
+| ------------------------------------------ | ---------------------------------- |
+| `acme.localtest.me`, known slug            | organisation resolved              |
+| `nobody.localtest.me`, unknown slug        | 404 problem+json                   |
+| `a.b.localtest.me`, or an invalid label    | 404 problem+json, no lookup        |
+| `app.localtest.me` (reserved name)         | no organisation, request continues |
+| `localtest.me`, `localhost`, an IP address | no organisation, request continues |
+
+Hosts outside the base domain resolve no organisation rather than failing, so health probes
+addressed by IP and local tooling keep working. Anything that needs an organisation fails on
+its own when it finds none.
+
+### Reserved names
+
+`www`, `app`, `api`, `web`, `ui`, `admin`, `administration`, `status`, `mail`, `docs`,
+`documentation` and `marketing` (see `modules/tenancy/slug.ts`) cannot be claimed:
+`OrganisationDirectory.create` and `renameSlug` refuse them (and report a duplicate as
+`SlugTakenError`, from the unique-violation `23505`, so a caller can answer 409), and a request to one of those
+hosts is treated as infrastructure rather than a lookup.
+
+### Caching
+
+Slug to organisation lookups are cached in Redis for 60 seconds. `renameSlug` deletes the
+old and new keys. A miss is never cached, so a newly created organisation is reachable
+immediately. If Redis is unavailable the lookup falls through to Postgres.
+
+### The GraphQL surfaces
+
+The HTTP GraphQL context copies `organisation` from the request. The WebSocket upgrade
+never passes through Express, so `onConnect` resolves it from the upgrade request's `Host`
+header with the same resolver and rejects the connection for an unknown organisation. The
+context factory still builds loaders per request; none is shared across organisations.
+
+### Local development without host files
+
+`APP_BASE_DOMAIN` defaults to `localtest.me`, a public domain whose wildcard resolves to
+127.0.0.1, so `http://acme.localtest.me:5173` works in any browser and in Playwright with no
+`/etc/hosts` entry. `*.localhost` was not used: browsers, Node's HTTP client and Playwright
+disagree on whether it resolves. The trade-off is that local development needs DNS access.
+
+Vite lists `.localtest.me` in `server.allowedHosts`, listens on `127.0.0.1`, and its proxy uses
+`changeOrigin: false`, so the browser's `Host` header reaches the API unchanged. With `changeOrigin: true` the API
+would see `localhost:3000` and never find the organisation. The explicit `127.0.0.1` bind
+matters because `localtest.me` resolves to an IPv4 address and Vite's default `localhost` bind can
+be IPv6-only, which gave `ERR_CONNECTION_REFUSED` in the e2e run.
+
+### The override header
+
+`X-Organisation-Slug` names an organisation when the host names none, for offline use and
+tools that cannot use subdomains. Anyone who can set a header can impersonate any
+organisation with it, so it is honoured only when `ALLOW_ORGANISATION_OVERRIDE=true`, which
+defaults to false and is set in `.env.example` for local development only. It is an explicit
+flag rather than a check on `NODE_ENV` because `NODE_ENV` defaults to `development` when
+unset, so a deployment that forgot it would ship the impersonation primitive enabled. The
+HTTP and WebSocket paths share the one resolver and so the same flag. The refusal is covered
+by `organisation-resolver.spec.ts` and `tenancy.integration.spec.ts`, each of which also
+shows the header working when enabled so the disabled case is not vacuous.

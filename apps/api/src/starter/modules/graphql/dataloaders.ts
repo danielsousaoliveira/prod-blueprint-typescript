@@ -1,4 +1,5 @@
 import DataLoader from 'dataloader';
+import type { Organisation } from '../tenancy/organisation';
 
 /**
  * Per-request DataLoaders.
@@ -90,4 +91,5 @@ export interface GraphQLContext {
    * request at all — the consumers narrow it.
    */
   readonly req?: unknown;
+  readonly organisation?: Organisation | undefined;
 }
