@@ -121,6 +121,19 @@ const envSchema = z.object({
     .transform((value) => value === 'true'),
 
   /**
+   * Parent domain for the session cookie, e.g. `localtest.me` or `example.com`. Unset
+   * (the default) leaves the cookie host-only: it is sent to exactly the host that set it,
+   * so a session on one organisation's subdomain is invisible to every other. Set it to
+   * share one sign-in across all organisation subdomains, accepting the exposure described
+   * in docs/tenancy.md.
+   */
+  SESSION_COOKIE_DOMAIN: z
+    .string()
+    .min(1)
+    .optional()
+    .transform((value) => value?.trim().toLowerCase().replace(/^\./, '')),
+
+  /**
    * Login brute-force limits. Two counters, because email-only enables lockout attacks
    * and IP-only misses password spraying (see `login-rate-limiter.ts`). The per-IP limit
    * is deliberately looser: offices and mobile carriers share addresses, so a tight one
