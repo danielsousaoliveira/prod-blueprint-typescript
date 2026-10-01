@@ -233,3 +233,62 @@ unset, so a deployment that forgot it would ship the impersonation primitive ena
 HTTP and WebSocket paths share the one resolver and so the same flag. The refusal is covered
 by `organisation-resolver.spec.ts` and `tenancy.integration.spec.ts`, each of which also
 shows the header working when enabled so the disabled case is not vacuous.
+
+## Cross-site request protection per organisation
+
+`CsrfMiddleware` rejects a state-changing request whose `Origin` is present and not allowed.
+An origin is allowed if it is in `ALLOWED_ORIGINS` (the marketing site, the dev server) or
+if it is `https://<slug>.<APP_BASE_DOMAIN>` for a valid slug (`modules/auth/origin-policy.ts`).
+
+The second rule parses the origin as a URL and matches the hostname's labels. It does not
+compare strings, because a suffix comparison accepts `evilexample.com` for `example.com`
+and `acme-example.com` for `acme.example.com`. Specifically it requires:
+
+- the origin to round-trip through `URL` unchanged, so paths, credentials and trailing
+  slashes are rejected;
+- the hostname to end in `.` plus the base domain, so a look-alike that merely shares the
+  trailing characters is not a subdomain;
+- exactly one label before that, and that label to be a valid organisation slug, so
+  `a.b.example.com` and `-x.example.com` are rejected;
+- `https`, when `SESSION_COOKIE_SECURE` is on. Plain `http` is accepted only for
+  development.
+
+The slug does not have to exist. The check is about whether the origin could be one of
+ours, and a database lookup on every mutating request would cost more than it protects:
+every organisation subdomain resolves to the same application, and the session cookie
+decides what the request can do.
+
+### Requests with no `Origin` are allowed, on purpose
+
+The payment provider's webhook sends no `Origin`, as do `curl` and server-to-server calls.
+The attack this check defends against is browser-driven: it relies on the browser attaching
+a cookie automatically. A client with no `Origin` is not a browser and has no cookie jar to
+abuse. Rejecting it would break the webhook for no gain. `Sec-Fetch-Site: cross-site` is
+still rejected. `csrf.middleware.spec.ts` names this reasoning in the test that covers it.
+
+### The session cookie and the parent domain
+
+By default the session cookie is host-only: only the exact host that set it receives it, so
+a session on `acme.example.com` is not sent to `globex.example.com`.
+
+Setting `SESSION_COOKIE_DOMAIN=example.com` scopes it to the parent domain, so one sign-in
+works across every organisation a person belongs to. That is an opt-in with a real cost:
+
+- **Any subdomain can act as the user everywhere.** If one organisation's subdomain is
+  compromised (an XSS in tenant-controlled content, a subdomain takeover after a slug is
+  released), script running there can send authenticated requests to every other
+  organisation the user belongs to.
+- The cookie is sent to every subdomain, including reserved ones such as `status` and
+  `docs`, so those must not run untrusted content.
+
+Mitigations in place:
+
+- The cookie is `HttpOnly`, so script cannot read it, only use it from the page.
+- `SameSite=Lax` and the origin check above stop another site from forging requests with it.
+- Slugs are validated and reserved names cannot be claimed, so a customer cannot register
+  an infrastructure host.
+- The domain is opt-in; the default is the narrower host-only scope.
+
+Not in place yet, and worth doing before enabling it in production: serve tenant-controlled
+content from a separate registrable domain, and release slugs only after a quarantine
+period so a deleted organisation's name cannot be re-registered by someone else.

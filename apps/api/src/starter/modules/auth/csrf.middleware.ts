@@ -2,6 +2,7 @@ import { HttpStatus, Injectable, type NestMiddleware, Inject } from '@nestjs/com
 import type { NextFunction, Request, Response } from 'express';
 import { ENV, type Env } from '../../config/env';
 import { ProblemException, problems } from '../../shared/http/problem-details';
+import { isAllowedOrigin } from './origin-policy';
 
 /**
  * CSRF defence in depth.
@@ -89,7 +90,14 @@ export class CsrfMiddleware implements NestMiddleware {
      * Rejecting originless requests would break every non-browser client for no security
      * gain. `Sec-Fetch-Site`, checked below, is the stricter modern signal.
      */
-    if (origin !== undefined && !this.env.ALLOWED_ORIGINS.includes(origin)) {
+    if (
+      origin !== undefined &&
+      !isAllowedOrigin(origin, {
+        explicitOrigins: this.env.ALLOWED_ORIGINS,
+        baseDomain: this.env.APP_BASE_DOMAIN,
+        requireHttps: this.env.SESSION_COOKIE_SECURE,
+      })
+    ) {
       throw new ProblemException({
         type: problems.crossOrigin,
         title: 'Cross-origin request rejected',
