@@ -73,27 +73,51 @@ describe('the runtime Postgres role', () => {
     ).rejects.toThrow(/permission denied/i);
   });
 
-  it('can read and write rows it has been granted', async () => {
+  it('can read and write tenant tables it has been granted', async () => {
     await harness
       .pool('owner')
       .query(
-        "INSERT INTO app.tenants (slug, name) VALUES ('acme', 'Acme Inc') ON CONFLICT (slug) DO NOTHING",
+        "INSERT INTO app.organisations (slug, name) VALUES ('acme', 'Acme Inc') ON CONFLICT (slug) DO NOTHING",
       );
-
-    await harness
-      .pool('app')
-      .query("UPDATE app.tenants SET name = 'Acme' WHERE slug = 'acme'");
 
     const { rows } = await harness
       .pool('app')
-      .query<{ name: string }>("SELECT name FROM app.tenants WHERE slug = 'acme'");
-    expect(rows[0]?.name).toBe('Acme');
+      .query<{ name: string }>("SELECT name FROM app.organisations WHERE slug = 'acme'");
+    expect(rows[0]?.name).toBe('Acme Inc');
+  });
+
+  it('can only read organisations, never write them', async () => {
+    const app = harness.pool('app');
+
+    await expect(
+      app.query("INSERT INTO app.organisations (slug, name) VALUES ('rogue', 'Rogue')"),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      app.query("UPDATE app.organisations SET name = 'Hijacked' WHERE slug = 'acme'"),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      app.query("DELETE FROM app.organisations WHERE slug = 'acme'"),
+    ).rejects.toThrow(/permission denied/i);
   });
 });
 
 describe('the privileged roles (proves the checks above can fail)', () => {
   it('the owner role CAN bypass row-level security', async () => {
     expect((await bypassFlags('owner')).rolbypassrls).toBe(true);
+  });
+
+  it('the cross-tenant role may create and rename organisations but not delete them', async () => {
+    const crosstenant = harness.pool('crosstenant');
+
+    await crosstenant.query(
+      "INSERT INTO app.organisations (slug, name) VALUES ('crossco', 'Cross Co')",
+    );
+    await crosstenant.query(
+      "UPDATE app.organisations SET name = 'Cross' WHERE slug = 'crossco'",
+    );
+    await expect(
+      crosstenant.query("DELETE FROM app.organisations WHERE slug = 'crossco'"),
+    ).rejects.toThrow(/permission denied/i);
   });
 
   it('the cross-tenant role CAN bypass row-level security but still owns nothing', async () => {

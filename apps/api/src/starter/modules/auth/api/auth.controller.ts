@@ -151,8 +151,12 @@ export class AuthController {
     secure: boolean;
     path: string;
     maxAge: number;
+    domain?: string;
   } {
     return {
+      ...(this.env.SESSION_COOKIE_DOMAIN
+        ? { domain: this.env.SESSION_COOKIE_DOMAIN }
+        : {}),
       /**
        * The whole reason for choosing a cookie over localStorage. JavaScript cannot read
        * this value, so an XSS that would otherwise exfiltrate a token gets nothing — it

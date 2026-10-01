@@ -38,6 +38,7 @@ jobs:
       # different dependency tree than the one that was reviewed.
       - run: npm ci
       - run: npm run lint
+      - run: npm run lint:boundary-rules
       - run: npm run format:check
 
   typecheck:

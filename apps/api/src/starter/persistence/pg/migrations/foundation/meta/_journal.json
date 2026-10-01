@@ -15,6 +15,20 @@
       "when": 1789034948807,
       "tag": "0001_roles_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790851986638,
+      "tag": "0002_tenancy_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790851987320,
+      "tag": "0003_tenant_isolation",
+      "breakpoints": true
     }
   ]
 }

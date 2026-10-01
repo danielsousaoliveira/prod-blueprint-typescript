@@ -11,12 +11,14 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    host: '127.0.0.1',
+    allowedHosts: ['.localtest.me'],
     // The API is a separate origin in development. Proxying rather than enabling CORS
     // means the browser sees one origin, so cookies and same-origin assumptions behave
     // exactly as they will in production behind a single ingress.
     proxy: {
-      '/v1': { target: 'http://localhost:3000', changeOrigin: true },
-      '/graphql': { target: 'http://localhost:3000', changeOrigin: true },
+      '/v1': { target: 'http://localhost:3000', changeOrigin: false },
+      '/graphql': { target: 'http://localhost:3000', changeOrigin: false },
     },
   },
   test: {
