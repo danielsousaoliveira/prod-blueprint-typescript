@@ -312,3 +312,35 @@ Mitigations in place:
 Not in place yet, and worth doing before enabling it in production: serve tenant-controlled
 content from a separate registrable domain, and release slugs only after a quarantine
 period so a deleted organisation's name cannot be re-registered by someone else.
+
+## Proving isolation
+
+Two integration suites under `apps/api/src/starter/infra/`, both run by the `Integration
+tests` CI job (`npm run test:integration`).
+
+`tenant-isolation.integration.spec.ts` issues raw SQL, not repository calls, so no
+application-layer filtering can be credited for a result. It uses its own pool connected as
+`tenantforge_app`, separate from the pool that seeds fixtures as the owner, and its first
+test asserts the role it is actually using cannot bypass row-level security. It covers:
+
+- a read under one organisation's context returns only that organisation's rows, and asking
+  for another's by id or by `organisation_id` returns none;
+- an insert naming another organisation is refused, for each tenant table;
+- an update or delete of another organisation's row affects zero rows, checked again as the
+  owner so a zero is not a broken statement;
+- any statement with no context raises `TF001`;
+- after a tenant transaction ends and the connection is borrowed again (same backend pid,
+  pool of one), no context is present.
+
+`tenant-isolation-catalogue.integration.spec.ts` enumerates every table in `pg_class` and
+fails unless it has isolation enabled and forced, policies covering SELECT, INSERT, UPDATE
+and DELETE with a write check, and a filter on `current_organisation_id()`. A table that
+should be exempt goes in `ISOLATION_ALLOWLIST` in `apps/api/test/unprotected-tables.ts`
+with a reason, which makes exempting a table a reviewable diff. There are two entries:
+`app.organisations` and the migration bookkeeping table.
+
+Both suites include tests that deliberately build the broken setup and assert it is
+detected: a table with no isolation, enabled but not forced, forced with no policy, a
+read-only policy, a policy of `USING (true)`, a session-scoped setting that does leak
+between borrowers, and the owner and cross-tenant roles reading everything. Each was also
+checked by editing the migration or the runner and confirming the suite goes red.
