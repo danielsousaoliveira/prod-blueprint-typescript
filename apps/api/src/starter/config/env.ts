@@ -109,6 +109,31 @@ const envSchema = z.object({
     .transform((value) => value === 'true'),
 
   /**
+   * Honour the `X-Organisation-Slug` header as the organisation when the host names none.
+   * Anyone who can set a header can impersonate any organisation with it, so this is an
+   * explicit opt-in that defaults to off. It is deliberately not derived from NODE_ENV:
+   * NODE_ENV defaults to `development` when unset, so a deployment that forgot to set it
+   * would otherwise ship the impersonation primitive enabled.
+   */
+  ALLOW_ORGANISATION_OVERRIDE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+
+  /**
+   * Parent domain for the session cookie, e.g. `localtest.me` or `example.com`. Unset
+   * (the default) leaves the cookie host-only: it is sent to exactly the host that set it,
+   * so a session on one organisation's subdomain is invisible to every other. Set it to
+   * share one sign-in across all organisation subdomains, accepting the exposure described
+   * in docs/tenancy.md.
+   */
+  SESSION_COOKIE_DOMAIN: z
+    .string()
+    .min(1)
+    .optional()
+    .transform((value) => value?.trim().toLowerCase().replace(/^\./, '')),
+
+  /**
    * Login brute-force limits. Two counters, because email-only enables lockout attacks
    * and IP-only misses password spraying (see `login-rate-limiter.ts`). The per-IP limit
    * is deliberately looser: offices and mobile carriers share addresses, so a tight one
@@ -135,6 +160,17 @@ const envSchema = z.object({
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0),
     ),
+
+  /**
+   * The domain organisations are served under: `acme.<APP_BASE_DOMAIN>` is the
+   * organisation with slug `acme`. Defaults to a public domain whose wildcard resolves to
+   * 127.0.0.1, so subdomains work locally without editing host files.
+   */
+  APP_BASE_DOMAIN: z
+    .string()
+    .min(1)
+    .default('localtest.me')
+    .transform((value) => value.trim().toLowerCase()),
 
   /**
    * Seeds demo accounts in migration 005. Refused in production by the migration itself

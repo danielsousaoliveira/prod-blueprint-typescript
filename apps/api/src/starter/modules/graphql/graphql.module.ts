@@ -4,6 +4,12 @@ import { GraphQLModule as NestGraphQLModule } from '@nestjs/graphql';
 import { ENV, type Env } from '../../config/env';
 import { demonstrationRegistry } from '../../demonstration-registry';
 import { AuthService } from '../auth/application/auth.service';
+import { OrganisationResolver } from '../tenancy/organisation-resolver';
+import { resolveUpgradeOrganisation } from '../tenancy/upgrade-organisation';
+import {
+  ORGANISATION_PROPERTY,
+  type RequestWithOrganisation,
+} from '../tenancy/tenant-resolution.middleware';
 import { ComplexityPlugin } from './complexity.plugin';
 import type { GraphQLContext } from './dataloaders';
 import { MAX_DEPTH, depthLimit } from './query-guards';
@@ -44,10 +50,16 @@ function readCookie(header: string | undefined, name: string): string | undefine
     NestGraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       imports: [...demonstrationRegistry.graphqlModules],
-      inject: [ENV, AuthService, ...demonstrationRegistry.loaderInjectionTokens],
+      inject: [
+        ENV,
+        AuthService,
+        OrganisationResolver,
+        ...demonstrationRegistry.loaderInjectionTokens,
+      ],
       useFactory: (
         env: Env,
         auth: AuthService,
+        organisations: OrganisationResolver,
         ...loaderDeps: unknown[]
       ): ApolloDriverConfig => ({
         /**
@@ -87,6 +99,9 @@ function readCookie(header: string | undefined, name: string): string | undefine
            * single most dangerous line in the auth module.
            */
           req: ctx.req,
+          organisation: (ctx.req as RequestWithOrganisation | undefined)?.[
+            ORGANISATION_PROPERTY
+          ],
         }),
 
         // Introspection and the playground are development-only. In production they hand
@@ -136,7 +151,9 @@ function readCookie(header: string | undefined, name: string): string | undefine
              * than saying so.
              * ============================================================================
              */
-            onConnect: async (context: unknown): Promise<Record<string, unknown>> => {
+            onConnect: async (
+              context: unknown,
+            ): Promise<Record<string, unknown> | false> => {
               // `graphql-ws`'s Context type does not describe `extra`, which is where the
               // driver stashes the upgrade request. Narrowed here rather than fought with
               // — the shape is checked at every step, so a change in the library surfaces
@@ -146,14 +163,18 @@ function readCookie(header: string | undefined, name: string): string | undefine
               const headers = (request as { headers?: unknown } | undefined)?.headers;
               const cookieHeader = (headers as { cookie?: unknown } | undefined)?.cookie;
 
+              const resolved = await resolveUpgradeOrganisation(organisations, headers);
+              if (!resolved.ok) return false;
+              const { organisation } = resolved;
+
               const sessionId =
                 typeof cookieHeader === 'string'
                   ? readCookie(cookieHeader, env.SESSION_COOKIE_NAME)
                   : undefined;
-              if (!sessionId) return { actor: undefined };
+              if (!sessionId) return { actor: undefined, organisation };
 
               const actor = await auth.resolve(sessionId);
-              return { actor: actor ?? undefined };
+              return { actor: actor ?? undefined, organisation };
             },
           },
         },

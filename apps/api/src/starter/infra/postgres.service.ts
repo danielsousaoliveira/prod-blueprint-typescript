@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
-import { Pool } from 'pg';
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 import { ENV, type Env } from '../config/env';
 
 /**
@@ -16,7 +16,7 @@ import { ENV, type Env } from '../config/env';
 @Injectable()
 export class PostgresService implements OnApplicationShutdown {
   private readonly logger = new Logger(PostgresService.name);
-  readonly pool: Pool;
+  private readonly pool: Pool;
 
   constructor(@Inject(ENV) private readonly env: Env) {
     this.pool = new Pool({
@@ -42,6 +42,17 @@ export class PostgresService implements OnApplicationShutdown {
    */
   async ping(): Promise<void> {
     await this.pool.query('SELECT 1');
+  }
+
+  connect(): Promise<PoolClient> {
+    return this.pool.connect();
+  }
+
+  queryOutsideTenant<R extends QueryResultRow = QueryResultRow>(
+    text: string,
+    values?: readonly unknown[],
+  ): Promise<QueryResult<R>> {
+    return this.pool.query<R>(text, values === undefined ? undefined : [...values]);
   }
 
   async onApplicationShutdown(): Promise<void> {
