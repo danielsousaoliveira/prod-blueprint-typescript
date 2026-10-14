@@ -129,7 +129,7 @@ jobs:
           POSTGRES_CROSS_TENANT_URL: postgres://tenantforge_crosstenant:crosstenant@localhost:5432/tenantforge
 
       # Postgres migrations run as their own explicit deploy step, using the owner
-      # connection — never the runtime one. No feature reads Postgres yet; this proves
+      # connection — never the runtime one. Authentication reads Postgres; this proves
       # the runner works against a real database and leaves the schema in place.
       - run: npm run db:migrate:pg
         env:

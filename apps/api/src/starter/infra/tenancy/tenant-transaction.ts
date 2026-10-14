@@ -87,6 +87,12 @@ export class TenantTransactionRunner {
 
 @Injectable()
 export class TenantDb {
+  get inTransaction(): boolean {
+    const transaction = storage.getStore();
+    if (transaction && !transaction.open) throw new NoTenantTransactionError();
+    return transaction !== undefined;
+  }
+
   get organisationId(): string {
     return this.current().organisationId;
   }

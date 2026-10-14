@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { ConfigModule } from './config/config.module';
 import { ENV, type Env } from './config/env';
+import { httpLoggerOptions } from './config/http-logger';
 import { InfraModule } from './infra/infra.module';
 import { demonstrationRegistry } from './demonstration-registry';
 import { AuthModule } from './modules/auth/auth.module';
@@ -18,26 +19,7 @@ import { testSupportModules } from './test-support/test-support.controller';
     LoggerModule.forRootAsync({
       inject: [ENV],
       useFactory: (env: Env) => ({
-        pinoHttp: {
-          level: env.LOG_LEVEL,
-          // Structured JSON in production so a log aggregator can index the fields;
-          // human-readable in development because nobody reads raw JSON by choice.
-          //
-          // Spread rather than `transport: cond ? x : undefined` because
-          // exactOptionalPropertyTypes distinguishes "property absent" from "property
-          // present and undefined", and pino's types only accept the former. This is
-          // the flag paying for itself: passing an explicit undefined here would have
-          // been accepted by plain `strict` and is a real mismatch.
-          ...(env.NODE_ENV === 'development'
-            ? { transport: { target: 'pino-pretty', options: { singleLine: true } } }
-            : {}),
-          // Health checks run every few seconds. Logging them at info level buries
-          // everything that matters.
-          autoLogging: {
-            ignore: (req) => req.url?.startsWith('/health') ?? false,
-          },
-          redact: ['req.headers.authorization', 'req.headers.cookie'],
-        },
+        pinoHttp: httpLoggerOptions(env),
       }),
     }),
     HealthModule,

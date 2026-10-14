@@ -30,7 +30,9 @@
     "db:explain": "npm run db:explain --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "db:seed:identities": "npm run db:seed:identities --workspace=apps/api",
+    "db:import:identities": "npm run db:import:identities --workspace=apps/api"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [

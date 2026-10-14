@@ -1,3 +1,4 @@
+import { ISOLATION_ALLOWLIST } from '../../../test/unprotected-tables';
 import {
   startPostgresHarness,
   type PostgresHarness,
@@ -175,18 +176,19 @@ describe('the tenancy schema', () => {
 describe('the tenant column convention', () => {
   const tenantTables = ['people', 'memberships', 'invitations'];
 
-  it('is spelled organisation_id on every table that is not organisations', async () => {
+  it('is spelled organisation_id on every table outside the global allowlist', async () => {
     const { rows } = await owner().query<{ table_name: string }>(
       `SELECT t.table_name
          FROM information_schema.tables t
         WHERE t.table_schema = 'app'
           AND t.table_type = 'BASE TABLE'
-          AND t.table_name <> 'organisations'
+          AND (t.table_schema || '.' || t.table_name) <> ALL($1)
           AND NOT EXISTS (
             SELECT 1 FROM information_schema.columns c
              WHERE c.table_schema = 'app'
                AND c.table_name = t.table_name
                AND c.column_name = 'organisation_id')`,
+      [ISOLATION_ALLOWLIST.map((entry) => entry.table)],
     );
 
     expect(rows).toEqual([]);

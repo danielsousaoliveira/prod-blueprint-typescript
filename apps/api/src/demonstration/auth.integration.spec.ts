@@ -18,11 +18,7 @@ import {
   InMemoryDistributedLock,
 } from '../starter/shared/locking/distributed-lock';
 import { type MongoHarness, startMongoHarness } from '../../test/mongo-harness';
-import {
-  createAuthHarness,
-  TEST_PASSWORD,
-  type AuthHarness,
-} from '../../test/auth-harness';
+import { TEST_PASSWORD, type AuthHarness } from '../../test/auth-harness';
 import { AvailabilityCache } from './modules/availability/application/availability.cache';
 import { AvailabilityService } from './modules/availability/application/availability.service';
 import {
@@ -52,6 +48,7 @@ import { AuthController } from '../starter/modules/auth/api/auth.controller';
 import { CsrfMiddleware } from '../starter/modules/auth/csrf.middleware';
 import { ENV, type Env } from '../starter/config/env';
 import { HealthController } from '../starter/modules/health/health.controller';
+import { createPostgresAuthHarness } from '../../test/postgres-auth-harness';
 import { HealthService } from '../starter/modules/health/health.service';
 
 /**
@@ -82,6 +79,7 @@ jest.setTimeout(180_000);
 let harness: MongoHarness;
 let app: INestApplication;
 let auth: AuthHarness;
+let authDatabase: Awaited<ReturnType<typeof createPostgresAuthHarness>>;
 
 let patientCookie: string;
 let doctorCookie: string;
@@ -112,7 +110,8 @@ const scheduleFor = (doctorId: string): DoctorSchedule => ({
 
 beforeAll(async () => {
   harness = await startMongoHarness();
-  auth = createAuthHarness();
+  authDatabase = await createPostgresAuthHarness();
+  auth = authDatabase.auth;
 
   const doctorRepo = new MongoDoctorRepository(harness.mongoService);
   const patientRepo = new MongoPatientRepository(harness.mongoService);
@@ -198,11 +197,12 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.close();
   await harness?.stop();
+  await authDatabase?.stop();
 });
 
 beforeEach(async () => {
   await harness.reset();
-  auth.users.clear();
+  await auth.users.clear();
   auth.sessions.clear();
 
   const availability = new MongoAvailabilityRepository(harness.mongoService);

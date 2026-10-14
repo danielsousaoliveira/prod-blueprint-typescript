@@ -1,8 +1,8 @@
 import type { User } from './user';
 
 /**
- * The port. A Mongo adapter and an in-memory adapter both implement it, and both are
- * held to one shared contract suite — the same arrangement as `AppointmentRepository`.
+ * The port. Postgres and in-memory adapters implement the same interface; authentication
+ * services never depend on either storage mechanism.
  */
 export interface UserRepository {
   /**
@@ -21,9 +21,7 @@ export interface UserRepository {
 
 export const USER_REPOSITORY = Symbol('USER_REPOSITORY');
 
-export const USERS_COLLECTION = 'users';
-
-/** Normalisation lives here so both the adapter and the migration use one definition. */
+/** Normalisation lives here so all repository adapters use one definition. */
 export function normaliseEmail(email: string): string {
   return email.trim().toLowerCase();
 }

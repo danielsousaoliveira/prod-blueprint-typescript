@@ -11,6 +11,8 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { TenantTransactionRunner } from '../../../infra/tenancy/tenant-transaction';
+import type { RequestWithOrganisation } from '../../tenancy/tenant-resolution.middleware';
 import { ENV, type Env } from '../../../config/env';
 import {
   ProblemException,
@@ -33,6 +35,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     @Inject(ENV) private readonly env: Env,
+    private readonly transactions: TenantTransactionRunner,
   ) {}
 
   /**
@@ -49,10 +52,13 @@ export class AuthController {
   @UsePipes(new ZodValidationPipe(loginSchema))
   async login(
     @Body() body: LoginBody,
-    @Req() request: Request,
+    @Req() request: RequestWithOrganisation,
     @Res({ passthrough: true }) response: Response,
   ): Promise<SessionDto> {
-    const result = await this.auth.login(body.email, body.password, clientIp(request));
+    const login = () => this.auth.login(body.email, body.password, clientIp(request));
+    const result = request.organisation
+      ? await this.transactions.run(request.organisation.id, login)
+      : await login();
 
     if (!result.ok) {
       /**

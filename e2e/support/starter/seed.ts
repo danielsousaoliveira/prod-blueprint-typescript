@@ -1,12 +1,12 @@
-import { MongoClient } from 'mongodb';
+import { Pool } from 'pg';
 import { hashPassword } from '../../../apps/api/src/starter/modules/auth/domain/password';
 
 /**
  * Generic account seeding shared by every e2e project.
  *
- * This is the foundation layer: it knows about `users` and nothing about doctors,
+ * This is the foundation layer: it knows about relational identities and nothing about doctors,
  * patients, or appointments. The demonstration project's seeding composes on top of this
- * rather than duplicating the password-hashing and user-document logic — a foundation-only
+ * rather than duplicating the password-hashing and identity-row logic — a foundation-only
  * test never needs to import anything from `support/demonstration`.
  */
 
@@ -39,7 +39,7 @@ export function uniqueSuffix(label: string): string {
 }
 
 /**
- * Seeds a single user account, directly in MongoDB, hashed the same way the application
+ * Seeds a single user account, directly in Postgres, hashed the same way the application
  * hashes passwords.
  *
  * Seeded directly rather than through the registration endpoint — that endpoint does not
@@ -57,31 +57,28 @@ export async function seedUser(
   suffix: string,
   profileId?: string,
 ): Promise<SeededUser> {
-  const client = new MongoClient(MONGO_URL);
-  await client.connect();
+  const client = new Pool({
+    connectionString:
+      process.env.E2E_POSTGRES_URL ??
+      'postgres://tenantforge_app:app@localhost:5432/tenantforge',
+  });
 
   try {
     const userId = `user-${role}-${suffix}`;
     const email = `${role}-${suffix}@e2e.test`;
     const passwordHash = await hashPassword(E2E_PASSWORD);
 
-    await client
-      .db(DB_NAME)
-      .collection('users')
-      .replaceOne(
-        { _id: userId as never },
-        {
-          email,
-          passwordHash,
-          role,
-          profileId: profileId ?? userId,
-          createdAt: Date.now(),
-        },
-        { upsert: true },
-      );
+    await client.query(
+      `INSERT INTO app.identities (id, email, password_hash, role, profile_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, now())
+       ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email,
+         password_hash = EXCLUDED.password_hash, role = EXCLUDED.role,
+         profile_id = EXCLUDED.profile_id, updated_at = now()`,
+      [userId, email, passwordHash, role, profileId ?? userId],
+    );
 
     return { userId, email, password: E2E_PASSWORD };
   } finally {
-    await client.close();
+    await client.end();
   }
 }

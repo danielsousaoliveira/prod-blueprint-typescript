@@ -7,8 +7,12 @@ import { LoginRateLimiter } from './application/login-rate-limiter';
 import { RedisSessionStore, SESSION_STORE } from './application/session.store';
 import { AuthGuard } from './auth.guard';
 import { CsrfMiddleware } from './csrf.middleware';
+import { MEMBERSHIP_REPOSITORY } from './domain/membership.repository';
+import { PERSON_REPOSITORY } from './domain/person.repository';
+import { PgPersonRepository } from './persistence/pg-person.repository';
+import { PgMembershipRepository } from './persistence/pg-membership.repository';
 import { USER_REPOSITORY } from './domain/user.repository';
-import { MongoUserRepository } from './persistence/mongo-user.repository';
+import { PgUserRepository } from './persistence/pg-user.repository';
 
 /**
  * `@Global` because `AuthService` is needed by the guard, which runs for every module's
@@ -21,9 +25,11 @@ import { MongoUserRepository } from './persistence/mongo-user.repository';
 @Module({
   controllers: [AuthController],
   providers: [
+    { provide: PERSON_REPOSITORY, useClass: PgPersonRepository },
+    { provide: MEMBERSHIP_REPOSITORY, useClass: PgMembershipRepository },
     AuthService,
     LoginRateLimiter,
-    { provide: USER_REPOSITORY, useClass: MongoUserRepository },
+    { provide: USER_REPOSITORY, useClass: PgUserRepository },
     { provide: SESSION_STORE, useClass: RedisSessionStore },
     /**
      * ============================================================================
@@ -49,7 +55,7 @@ import { MongoUserRepository } from './persistence/mongo-user.repository';
         new AuthGuard(reflector, auth, env.SESSION_COOKIE_NAME),
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, USER_REPOSITORY, PERSON_REPOSITORY, MEMBERSHIP_REPOSITORY],
 })
 export class AuthModule implements NestModule {
   /**

@@ -28,6 +28,7 @@ describe('every table in the database', () => {
 
   it('keeps the allowlist short, named and justified', () => {
     expect(ISOLATION_ALLOWLIST.map((entry) => entry.table)).toEqual([
+      'app.identities',
       'app.organisations',
       'drizzle.__drizzle_migrations_foundation',
     ]);

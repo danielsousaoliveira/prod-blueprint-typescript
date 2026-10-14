@@ -29,10 +29,10 @@ That is API plus infrastructure. Then apply migrations and start the frontend in
 terminal:
 
 ```bash
-npm run db:migrate && npm run db:migrate:pg && npm run dev:web
+npm run db:migrate && npm run db:migrate:pg && npm run db:seed:identities && npm run dev:web
 ```
 
-Migration 005 seeds two demo accounts — **outside production only**:
+`npm run db:seed:identities` seeds two Postgres demo accounts — **outside production only**:
 
 | Account | Email                  | Password            |
 | ------- | ---------------------- | ------------------- |
@@ -50,9 +50,12 @@ harder to read than two windows.
 healthy — the API never races a replica set that is still electing a primary, nor a
 Postgres that is still starting.
 
-Postgres runs beside MongoDB from this phase on. No feature reads it yet; it is stood up
-first so the later move to relational storage is a sequence of reviewable changes rather
-than one unreviewable swap. It has its own migration step, `npm run db:migrate:pg`.
+Authentication identities, people and memberships now live in Postgres; the example
+scheduling domain remains in MongoDB. Apply `npm run db:migrate:pg` before serving this
+version. For an existing database, run `npm run db:import:identities` once to preserve
+Mongo account ids and password hashes; it refuses conflicting accounts. See
+[relational authentication](docs/tenancy.md#relational-authentication) for lookup isolation
+and the global identity directory.
 
 Verify:
 

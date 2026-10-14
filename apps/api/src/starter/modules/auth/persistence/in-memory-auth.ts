@@ -10,7 +10,8 @@ import { normaliseEmail, type UserRepository } from '../domain/user.repository';
  * and swapping them is a one-line DI change with no edit to the code under test. That is
  * what lets the HTTP integration suite exercise the REAL `AuthGuard` and the REAL
  * `AuthService` — including the timing-equalised login path and every authorization rule
- * — against one MongoDB container and no Redis at all.
+ * — without depending on a live identity store. The authentication acceptance suite
+ * instead uses the real Postgres adapter.
  *
  * The alternative would have been stubbing the guard in tests. That is the version that
  * passes while production is wide open, because the thing most likely to be wrong is the
@@ -22,7 +23,7 @@ export class InMemoryUserRepository implements UserRepository {
   findByEmail(email: string): Promise<User | null> {
     const target = normaliseEmail(email);
     for (const user of this.byId.values()) {
-      // Normalising BOTH sides, exactly as the Mongo adapter does. A test double that
+      // Normalising BOTH sides, exactly as the Postgres adapter does. A test double that
       // skipped this would pass while production failed for anyone who typed a capital
       // letter — the classic way an in-memory adapter lies.
       if (normaliseEmail(user.email) === target) return Promise.resolve(user);

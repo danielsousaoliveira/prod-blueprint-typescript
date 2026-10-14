@@ -1,5 +1,6 @@
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import type { Provider } from '@nestjs/common';
+import { TenantTransactionRunner } from '../src/starter/infra/tenancy/tenant-transaction';
 import type { RedisService } from '../src/starter/infra/redis.service';
 import { ENV, type Env } from '../src/starter/config/env';
 import { AuthService } from '../src/starter/modules/auth/application/auth.service';
@@ -8,7 +9,10 @@ import { SESSION_STORE } from '../src/starter/modules/auth/application/session.s
 import { AuthGuard } from '../src/starter/modules/auth/auth.guard';
 import { hashPassword } from '../src/starter/modules/auth/domain/password';
 import type { Role } from '../src/starter/modules/auth/domain/user';
-import { USER_REPOSITORY } from '../src/starter/modules/auth/domain/user.repository';
+import {
+  USER_REPOSITORY,
+  type UserRepository,
+} from '../src/starter/modules/auth/domain/user.repository';
 import {
   InMemorySessionStore,
   InMemoryUserRepository,
@@ -22,8 +26,8 @@ export const TEST_PASSWORD = 'test-password-123';
  *
  * The guard registered here is the REAL `AuthGuard`, bound the same way production binds
  * it (`APP_GUARD`), so these suites test the actual authentication path rather than a
- * stub. Only the two ports — users and sessions — are swapped for in-memory adapters, and
- * both mirror the real ones' semantics (see in-memory-auth.ts).
+ * stub. Sessions are in memory; users default to the in-memory adapter but can be supplied
+ * by a real database fixture. The authentication acceptance suite supplies Postgres.
  *
  * Registering a *fake* guard that always allows would make every authorization test in
  * the codebase meaningless while looking identical from the outside. That is the specific
@@ -31,7 +35,7 @@ export const TEST_PASSWORD = 'test-password-123';
  */
 export interface AuthHarness {
   readonly providers: Provider[];
-  readonly users: InMemoryUserRepository;
+  readonly users: UserRepository & { clear(): void | Promise<void> };
   readonly sessions: InMemorySessionStore;
   /** Create a user and return a ready-to-use cookie header value. */
   signIn(id: string, role: Role, profileId: string): Promise<string>;
@@ -39,8 +43,13 @@ export interface AuthHarness {
   createUser(id: string, email: string, role: Role, profileId: string): Promise<void>;
 }
 
-export function createAuthHarness(env?: Partial<Env>): AuthHarness {
-  const users = new InMemoryUserRepository();
+export function createAuthHarness(
+  env?: Partial<Env>,
+  users: UserRepository & {
+    clear(): void | Promise<void>;
+  } = new InMemoryUserRepository(),
+  transactions?: TenantTransactionRunner,
+): AuthHarness {
   const sessions = new InMemorySessionStore();
 
   const testEnv = {
@@ -92,6 +101,14 @@ export function createAuthHarness(env?: Partial<Env>): AuthHarness {
   const authService = new AuthService(users, sessions, rateLimiter);
 
   const providers: Provider[] = [
+    {
+      provide: TenantTransactionRunner,
+      useValue: transactions ?? {
+        run: () => {
+          throw new Error('This fixture has no tenant database');
+        },
+      },
+    },
     { provide: ENV, useValue: testEnv },
     { provide: USER_REPOSITORY, useValue: users },
     { provide: SESSION_STORE, useValue: sessions },
