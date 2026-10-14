@@ -1,6 +1,5 @@
 import type { Db } from 'mongodb';
 import { ACTIVE_STATUSES } from '../../modules/appointments/domain/appointment';
-import { hashPassword } from '../../../starter/modules/auth/domain/password';
 import { OUTBOX_COLLECTION } from '../../../starter/modules/outbox/domain/outbox';
 
 /**
@@ -153,79 +152,10 @@ export const migrations: readonly Migration[] = [
   },
   {
     id: '005-users',
-    description:
-      'User accounts: unique email index, and demo accounts outside production',
-    async up(db) {
-      /**
-       * Unique on email — the constraint that makes "one account per address" true rather
-       * than merely intended.
-       *
-       * Same reasoning as the appointment slot index (documented design choice): a check-then-
-       * insert in application code has a window between the read and the write, and two
-       * concurrent signups for the same address both pass it. The database is the only
-       * place that decides atomically.
-       *
-       * Emails are stored already-lowercased (`normaliseEmail`), so this is a plain unique
-       * index rather than a collation-based one. A case-insensitive collation would also
-       * work and would tolerate mixed-case data, but it changes how the index is used for
-       * ordinary lookups and is easy to get subtly wrong. Normalising on write is the
-       * simpler invariant: there is only ever one form in the database.
-       */
-      await db
-        .collection('users')
-        .createIndex({ email: 1 }, { name: 'uniq_user_email', unique: true });
-
-      /**
-       * ============================================================================
-       * DEMO ACCOUNTS, AND WHY THE PRODUCTION GUARD IS NOT PARANOIA
-       * ============================================================================
-       *
-       * These are real accounts with a known password. That is a backdoor — the fact
-       * that it exists for a good reason does not change what it is, and "seed data that
-       * was only meant for local development" is a recurring entry in breach write-ups.
-       *
-       * The guard is on NODE_ENV rather than on a dedicated flag deliberately: a flag is
-       * one more thing to set correctly, and the failure mode of forgetting it is that
-       * the accounts get created. NODE_ENV is already set correctly in every environment
-       * because everything else depends on it, so this piggybacks on a variable that is
-       * load-bearing elsewhere and therefore actually maintained.
-       *
-       * The password comes from config rather than being a literal here, so a deployment
-       * that genuinely wants demo accounts can set a real one.
-       * ============================================================================
-       */
-      if (process.env.NODE_ENV === 'production') return;
-
-      const password = process.env.SEED_DEMO_PASSWORD ?? 'demo-password-123';
-      const passwordHash = await hashPassword(password);
-      const now = Date.now();
-
-      // `replaceOne` + upsert so re-running is a no-op on a database that already has
-      // them — every migration in this file is idempotent, and this one especially needs
-      // to be, because it is the one developers re-run after dropping their data.
-      await db.collection('users').replaceOne(
-        { _id: 'user-doctor-demo' as never },
-        {
-          email: 'doctor@clinic.test',
-          passwordHash,
-          role: 'doctor',
-          profileId: 'doctor-1',
-          createdAt: now,
-        },
-        { upsert: true },
-      );
-
-      await db.collection('users').replaceOne(
-        { _id: 'user-patient-demo' as never },
-        {
-          email: 'patient@example.test',
-          passwordHash,
-          role: 'patient',
-          profileId: 'patient-1',
-          createdAt: now,
-        },
-        { upsert: true },
-      );
+    description: 'Retired: authentication accounts now live in Postgres',
+    up() {
+      // Preserve the journal entry; new databases must never create Mongo auth records.
+      return Promise.resolve();
     },
   },
 ];

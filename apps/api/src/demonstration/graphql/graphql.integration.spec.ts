@@ -166,7 +166,7 @@ beforeEach(async () => {
   useSharedLoaders = false;
   sharedLoaders = null;
 
-  auth.users.clear();
+  await auth.users.clear();
   auth.sessions.clear();
   doctorCookie = await auth.signIn('u-doctor', 'doctor', 'doctor-1');
   patientCookie = await auth.signIn('u-patient', 'patient', 'patient-1');

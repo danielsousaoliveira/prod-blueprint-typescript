@@ -5,10 +5,11 @@ Each section is added by the change that introduces the mechanism it describes.
 
 ## Schema
 
-Four tables in the `app` schema, all in `apps/api/src/starter/persistence/pg/schema.ts`:
+Five tables in the `app` schema, all in `apps/api/src/starter/persistence/pg/schema.ts`:
 
 | Table           | Scoped by `organisation_id` | Purpose                                             |
 | --------------- | --------------------------- | --------------------------------------------------- |
+| `identities`    | no (see below)              | Global credentials, shared across organisations     |
 | `organisations` | no (see below)              | One row per customer; the subdomain slug lives here |
 | `people`        | yes                         | Identity within one organisation                    |
 | `memberships`   | yes                         | A person's role and standing in the organisation    |
@@ -23,13 +24,14 @@ is what makes uniqueness per organisation rather than global. That includes prim
 `people`, `memberships` and `invitations` are keyed by `(organisation_id, id)`, and the
 membership foreign key to `people` references that composite key.
 
-### Email is unique per organisation, not globally
+### Person email is unique per organisation
 
 `people` has `UNIQUE (organisation_id, email)`. A globally unique email would let one
 customer probe whether another customer's staff have accounts, by attempting to invite an
 address and reading the error. The cost is that the same human appearing in two
-organisations has two `people` rows; linking them across organisations is a later concern
-and would sit above this table, not inside it.
+organisations has two `people` rows, linked by `identity_id` to the global credential
+directory described under Relational authentication. Inviting a person does not require
+creating a global credential or probing its uniqueness.
 
 Emails are stored lowercase and the database refuses anything else, so uniqueness cannot be
 sidestepped by case.
@@ -52,11 +54,12 @@ Every foreign key to `organisations` is `ON DELETE CASCADE`, and so is the membe
 person key. Deleting an organisation removes its people, memberships and invitations in
 one statement. This is covered in `tenancy-schema.integration.spec.ts`.
 
-### `organisations` is the deliberate exception to isolation
+### Global directories are deliberate exceptions to isolation
 
 A request carries a subdomain. Turning that into an organisation id has to happen before
 any tenant context exists, so the table it is read from cannot itself require one. The
-runtime role can read and write `organisations`; nothing else is exempt.
+runtime role can read and write `organisations`. The global credential directory
+`identities` is also exempt; people, memberships and invitations all retain forced RLS.
 
 ## Row-level isolation
 
@@ -336,11 +339,67 @@ test asserts the role it is actually using cannot bypass row-level security. It 
 fails unless it has isolation enabled and forced, policies covering SELECT, INSERT, UPDATE
 and DELETE with a write check, and a filter on `current_organisation_id()`. A table that
 should be exempt goes in `ISOLATION_ALLOWLIST` in `apps/api/test/unprotected-tables.ts`
-with a reason, which makes exempting a table a reviewable diff. There are two entries:
-`app.organisations` and the migration bookkeeping table.
+with a reason, which makes exempting a table a reviewable diff. There are three entries:
+`app.identities`, `app.organisations` and the migration bookkeeping table.
 
 Both suites include tests that deliberately build the broken setup and assert it is
 detected: a table with no isolation, enabled but not forced, forced with no policy, a
 read-only policy, a policy of `USING (true)`, a session-scoped setting that does leak
 between borrowers, and the owner and cross-tenant roles reading everything. Each was also
 checked by editing the migration or the runner and confirming the suite goes red.
+
+## Relational authentication
+
+`UserRepository` retains its original interface and domain shape. `PgUserRepository`
+replaces the Mongo adapter; password hashing, login control flow, dual rate limiting,
+opaque session ids and Redis session storage are unchanged. The legacy doctor/patient
+role and profile link stay on the identity as a compatibility bridge for the demonstration;
+they are not organisation standing. Moving those out of sessions belongs to the subsequent
+permission work, not this storage change.
+
+### Identity before organisation
+
+`app.identities` stores one global credential per normalised email. It contains no tenant
+standing. `IdentityDirectory`, in the infrastructure layer, accesses only that table with
+the ordinary runtime role. It never uses `PrivilegedDatabase`, a security-definer function,
+or a bypass role. This is an explicit catalogue allowlist entry, like the organisation
+slug directory, rather than weakening the policies on `people`.
+
+Keeping credentials on each tenant person was rejected: a root-host sign-in would need
+to read through every customer's isolation boundary or arbitrarily choose between multiple
+passwords for the same email. The cost of a global directory is global email uniqueness;
+future registration and recovery responses must not reveal whether that email exists.
+
+### Identity after organisation
+
+`people.identity_id` links an organisation's person to the global identity, with at most
+one person per identity in that organisation. It is nullable so existing person records
+and invited people without accounts remain valid. Deleting an identity unlinks people;
+deleting an organisation deletes its tenant records, never the shared credential.
+
+A login on an organisation host runs inside `TenantTransactionRunner`. The same user
+repository then joins identities to people and active memberships through `TenantDb`.
+The existing forced policies hide other organisations, even though the identity itself is
+global. Unknown email, missing membership and suspended membership all follow the existing
+dummy-hash verification path and return the same invalid-credentials response.
+
+Tenant person and membership repositories require a transaction for every operation.
+Their writes derive the organisation from `TenantDb`; their composite keys and foreign
+keys enforce tenant-local uniqueness and refuse memberships pointing into another tenant.
+Global credential writes are deliberately refused inside a tenant transaction, since one
+organisation must not change the password used by another. A future registration workflow
+must provision the global identity separately and then create tenant records atomically.
+
+### Local fixtures and deployment
+
+Run `db:migrate:pg` before serving this version, and `db:seed:identities` to create the
+local demo accounts. The latter refuses production and does not replace existing accounts.
+The retired Mongo migration keeps its journal id as a no-op and creates no user documents
+on fresh databases. Existing Mongo documents are not deleted by a schema migration; use
+`db:import:identities` once before switching an existing checkout to this version. It
+preserves hashes and ids and fails on conflicting credentials rather than overwriting them.
+
+The existing authentication HTTP/GraphQL suite runs with real Postgres account fixtures.
+`identity-repositories.integration.spec.ts` additionally covers both lookup scopes, active
+standing, tenant isolation, rollback, global email uniqueness, sign-in/sign-out/current
+user, the actual Argon2 calls on both failure paths, and both rate limit counters.

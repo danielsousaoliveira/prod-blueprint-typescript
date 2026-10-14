@@ -32,7 +32,7 @@ export type Role = 'doctor' | 'patient';
  */
 export interface User {
   readonly id: string;
-  /** Stored lowercased. The unique index is on the lowercased value — see migration 005. */
+  /** Stored lowercased. The unique index is on the lowercased value — see app.identities. */
   readonly email: string;
   readonly passwordHash: string;
   readonly role: Role;

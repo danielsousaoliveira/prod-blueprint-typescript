@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import type { TenantTransactionRunner } from '../../../infra/tenancy/tenant-transaction';
 import type { Env } from '../../../config/env';
 import type { AuthService } from '../application/auth.service';
 import { AuthController } from './auth.controller';
@@ -25,7 +26,7 @@ const signIn = async (env: Env): Promise<Record<string, unknown>> => {
     },
   } as unknown as Response;
 
-  await new AuthController(auth, env).login(
+  await new AuthController(auth, env, {} as TenantTransactionRunner).login(
     { email: 'a@example.test', password: 'pw' },
     { ip: '1.2.3.4', socket: {} } as unknown as Request,
     response,

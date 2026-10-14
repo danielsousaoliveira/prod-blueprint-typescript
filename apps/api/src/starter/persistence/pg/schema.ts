@@ -35,6 +35,28 @@ export const organisations = appSchema.table(
   ],
 );
 
+// Authentication precedes organisation resolution. Credentials belong to the human,
+// while people and memberships below remain protected by organisation RLS.
+export const identities = appSchema.table(
+  'identities',
+  {
+    id: text('id').primaryKey(),
+    email: text('email').notNull().unique(),
+    passwordHash: text('password_hash').notNull(),
+    role: text('role', { enum: ['doctor', 'patient'] }).notNull(),
+    profileId: text('profile_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      'identities_email_normalised',
+      sql`${table.email} = lower(btrim(${table.email}))`,
+    ),
+    check('identities_role_valid', sql`${table.role} IN ('doctor', 'patient')`),
+  ],
+);
+
 export const people = appSchema.table(
   'people',
   {
@@ -42,6 +64,9 @@ export const people = appSchema.table(
     organisationId: uuid('organisation_id')
       .notNull()
       .references(() => organisations.id, { onDelete: 'cascade' }),
+    identityId: text('identity_id').references(() => identities.id, {
+      onDelete: 'set null',
+    }),
     email: text('email').notNull(),
     displayName: text('display_name').notNull(),
     passwordHash: text('password_hash'),
@@ -50,6 +75,10 @@ export const people = appSchema.table(
   },
   (table) => [
     primaryKey({ name: 'people_pkey', columns: [table.organisationId, table.id] }),
+    unique('people_organisation_id_identity_id_unique').on(
+      table.organisationId,
+      table.identityId,
+    ),
     unique('people_organisation_id_email_unique').on(table.organisationId, table.email),
     check('people_email_lowercase', sql`${table.email} = lower(${table.email})`),
   ],

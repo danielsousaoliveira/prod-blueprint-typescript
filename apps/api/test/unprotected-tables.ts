@@ -7,6 +7,11 @@ export interface IsolationAllowlistEntry {
 
 export const ISOLATION_ALLOWLIST: readonly IsolationAllowlistEntry[] = [
   {
+    table: 'app.identities',
+    reason:
+      'Global credentials authenticate a human before an organisation is known. Tenant people and memberships remain isolated; this table contains no organisation standing.',
+  },
+  {
     table: 'app.organisations',
     reason:
       'The subdomain is resolved to an organisation before any tenant context exists, so this table sits above the isolation boundary.',

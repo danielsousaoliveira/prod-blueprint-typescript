@@ -173,7 +173,7 @@ const envSchema = z.object({
     .transform((value) => value.trim().toLowerCase()),
 
   /**
-   * Seeds demo accounts in migration 005. Refused in production by the migration itself
+   * Seeds demo accounts with db:seed:identities. Refused in production by the seed command
    * — a known-password account is a backdoor, and "it is only for the demo" is exactly
    * how one reaches production.
    */
